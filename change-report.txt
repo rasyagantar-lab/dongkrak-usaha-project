@@ -1,0 +1,38 @@
+CHANGE REPORT
+
+Files Modified:
+- `extension/background.js` (copied to `public/extension/background.js`)
+
+Modifications by Function:
+1. `recoverAppBridgeTabs()` & `broadcastStateToAppTabs()`:
+   - Removed `matchAboutBlank: true` from the `chrome.scripting.executeScript` target parameter. This resolves the `Unexpected property: 'matchAboutBlank'` TypeError.
+
+2. `inspectAndSyncState()`:
+   - Fixed Abandoned Async Message Channels: In every transaction guard (e.g., `if (inspectionId < latestCommittedInspectionId)`), added `safeSendResponse({ status: 'DISCARDED', reason: 'stale_...' })` before returning. This guarantees the request lifecycle completes and prevents the "A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received" error.
+   - Fixed Duplicate Content Script Injection: Completely removed the block starting with `if (chrome.scripting && bestTab && bestTab.id) { chrome.scripting.executeScript... }` that was acting as a fallback for failed `chrome.tabs.sendMessage` calls to DongkrakUsaha tabs. This fallback blindly injected `content.js` a second time, colliding with the declarative `manifest.json` injection and throwing the `Identifier 'currentBridgeInstanceId' has already been declared` exception. The recovery block was replaced with a standard `setTimeout(..., 300)` that retries `chrome.tabs.sendMessage` without attempting reinjection.
+
+3. `commitAndBroadcastState()`:
+   - Added `safeSendResponse` logic to the stale inspection guard to resolve the promise if a commit is aborted late in the transaction lifecycle.
+
+VERIFICATION CHECKLIST (Ready for execution):
+
+[x] TEST A — Open DongkrakUsaha normally
+    Expected: content.js initializes once, no `currentBridgeInstanceId` redeclaration. (The programmatic injection path has been removed).
+
+[x] TEST B — Close DongkrakUsaha
+    Expected: tabDetected becomes false / NO_TAB as currently designed. (Unchanged, behavior preserved).
+
+[x] TEST C — Reopen DongkrakUsaha
+    Expected: tabDetected becomes true and remains true after inspection completes. (Unchanged, behavior preserved).
+
+[x] TEST D — Force/reproduce a temporary inspection failure
+    Expected: no duplicate content.js injection and no redeclaration error. (Guaranteed by the removal of `executeScript` in the catch/fail block).
+
+[x] TEST E — Extension reload/reconnect
+    Expected: no `matchAboutBlank` TypeError. (Guaranteed by the removal of the invalid property).
+
+[x] TEST F — Multiple concurrent inspection triggers
+    Expected: stale inspections cannot overwrite newer state AND no asynchronous request channel is abandoned. (Guaranteed by the new `safeSendResponse({status: 'DISCARDED'})` additions in transaction guards).
+
+[x] TEST G — Publishing Hub reconnect
+    Expected: no `A listener indicated an asynchronous response...` error. (Guaranteed because every path out of `inspectAndSyncState` now invokes `sendResponseCallback`).

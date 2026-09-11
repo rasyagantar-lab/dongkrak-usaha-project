@@ -1,0 +1,25 @@
+IMPLEMENTATION PLAN
+
+Functions to modify in `extension/background.js`:
+
+1. `recoverAppBridgeTabs()`: 
+   - Remove the invalid `matchAboutBlank: true` property from the `chrome.scripting.executeScript()` target object.
+2. `broadcastStateToAppTabs()`: 
+   - Remove the invalid `matchAboutBlank: true` property from the `chrome.scripting.executeScript()` target object.
+3. `inspectAndSyncState()`:
+   - For every stale transaction guard (`if (inspectionId < latestCommittedInspectionId)`), add `safeSendResponse({ status: 'DISCARDED' })` before the early `return;` so that abandoned async message channels are properly resolved.
+   - Replace the entire `chrome.scripting.executeScript` recovery block (around line 203) with a simple `setTimeout` that retries `chrome.tabs.sendMessage`. This eliminates the programmatic duplicate injection of `content.js` into DongkrakUsaha tabs, preventing the `Identifier 'currentBridgeInstanceId' has already been declared` exception.
+4. `commitAndBroadcastState()`:
+   - Update the stale inspection guard to also invoke `safeSendResponse({ status: 'DISCARDED' })` if a `sendResponseCallback` is available before returning.
+
+How duplicate Dongkrak injection is prevented:
+By entirely removing `chrome.scripting.executeScript` from the DongkrakUsaha failure recovery path. The extension will exclusively rely on the declarative manifest `content_scripts` for DongkrakUsaha.
+
+How async stale requests are completed:
+The `safeSendResponse` wrapper function is called with a specific `{ status: 'DISCARDED' }` payload before any `return` statement triggered by stale transaction IDs. This safely closes the message channel with a well-defined response.
+
+How stale global state remains protected:
+The existing `latestCommittedInspectionId` checks are fully preserved in both `inspectAndSyncState` and `commitAndBroadcastState`. Stale inspections are aborted before modifying `currentState` or incrementing `globalSequence`.
+
+How the App bridge remains functional:
+The programmatic injection of `content.js` into App/Studio tabs remains intact in both `recoverAppBridgeTabs` and `broadcastStateToAppTabs`, but without the `matchAboutBlank` error that previously broke it.

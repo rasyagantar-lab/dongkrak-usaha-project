@@ -1,0 +1,6 @@
+{
+  "name": "DongkrakUsaha AI Marketing & SEO Publisher",
+  "description": "Indonesian AI Marketing suite with local SEO strategy, AI Quality Control scoring, DongkrakUsaha preview, and automated listing publishing integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
