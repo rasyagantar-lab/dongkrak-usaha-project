@@ -462,7 +462,7 @@ NOT VERIFIED (cannot be, from this machine):
 - Whether the user's GCP project can enable billing at all (external blocker).
 - Design caveat to remember: in gcs mode the self-improvement log lives in the bucket and the RULES come from the image; editing `ai-agents/*.md` requires a redeploy to take effect. Documented in DEPLOY_CLOUD_RUN.md.
 
-Rollback unchanged: `git checkout master` (checkpoint `29781fe`). Local data untouched.
+Rollback: `git checkout master` (checkpoint `29781fe`). Local data untouched. ONE CAVEAT: the agents keep appending self-improvement notes to `ai-agents/*.md` while the experiment branch is checked out (they are committed there). A plain checkout of master would revert those files and drop notes added since the checkpoint. To keep them: `git checkout master && git checkout experiment/cloud-run -- ai-agents/ && git commit -m "carry agent notes"`.
 
 ## Roadmap Completion Summary (2026-09-14)
 All four phases of the approved plan are implemented. Evidence status per phase:
