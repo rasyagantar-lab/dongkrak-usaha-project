@@ -464,6 +464,20 @@ NOT VERIFIED (cannot be, from this machine):
 
 Rollback: `git checkout master` (checkpoint `29781fe`). Local data untouched. ONE CAVEAT: the agents keep appending self-improvement notes to `ai-agents/*.md` while the experiment branch is checked out (they are committed there). A plain checkout of master would revert those files and drop notes added since the checkpoint. To keep them: `git checkout master && git checkout experiment/cloud-run -- ai-agents/ && git commit -m "carry agent notes"`.
 
+### Finding: AI Studio DID modify the repo despite the do-not-modify notices (2026-09-14, evening)
+Method: the user uploaded a zip of `experiment/cloud-run` to AI Studio, deployed, and exported AI Studio's copy as a zip. Both zips were extracted OUTSIDE the repo (scratch folder) and diffed file by file. Nothing from AI Studio's copy was merged.
+What AI Studio changed (exact, verified by diff):
+1. `server.ts` -- `const PORT = Number(process.env.PORT) || 3000` reverted to `const PORT = 3000` (removes plain-Cloud-Run compatibility; only works where the platform proxies to 3000, which AI Studio's runtime does).
+2. `server.ts` -- `getFeatureApiKey` gained `|| (config.provider === "gemini" ? process.env.GEMINI_API_KEY : undefined)`: a silent fallback to a single global key. This directly violates AI_MODELS.md Rule 1 ("a worker must never fall back to GEMINI_API_KEY"). Consequence on AI Studio: all 7 agents share one key and one quota. Not invisible -- the fingerprint-based status will list all 7 under `sharedKeys` -- but the isolation design is defeated.
+3. `.env.example` -- every comment stripped (the intern-facing token-creation instructions, the key-slot model explanation, the deprecation note) and `GEMINI_API_KEY=` ADDED back at the top. `GCS_BUCKET` is absent, so AI Studio has no idea storage can be external.
+4. `package.json` -- `playwright-chromium` removed (harmless: only used by scratch test scripts and `test_dongkrakusaha.cjs`, never by the server).
+5. `index.html` -- title changed to "DongkrakUsaha AI Marketing & SEO Publisher", meta/og description added (cosmetic; the splash still says Asisten Premium).
+6. DELETED: `Dockerfile`, `package-lock.json`, `bun.lock`. AI Studio builds with its own pipeline, so our container definition is discarded and installs are no longer lockfile-reproducible.
+7. ADDED: `metadata.json` declaring `MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API` -- the manifest that makes AI Studio inject `GEMINI_API_KEY`.
+Untouched: `ai-agents/*.md`, `server/storage.ts`, `server/dongkrakusahaAdapter.ts`, all of `src/`, `.dockerignore`, the MD files.
+Assessment: exactly the failure mode predicted in the experiment's opening entry (item 7). The README/DEPLOY notices are requests, not controls. Whether the deployed app is usable depends on two things the diff cannot tell: (a) whether the user set the 7 per-agent keys + Cloudflare vars (else everything runs on the one injected key), and (b) whether `GCS_BUCKET` and bucket IAM were set on the underlying Cloud Run service (else storage=local on an ephemeral disk and all data vanishes on restart -- the original blocker, unaddressed).
+Decision so far: none of AI Studio's edits are adopted. The repo's `experiment/cloud-run` branch is unchanged. Next evidence needed: the service's `[Startup]` log lines.
+
 ## Roadmap Completion Summary (2026-09-14)
 All four phases of the approved plan are implemented. Evidence status per phase:
 - Phase 1 MD contracts: PROVEN (sentinel twice, notes on disk, then real notes from a production siege run).
