@@ -89,3 +89,6 @@ This file is your live rulebook: the application reads it fresh and shows it to 
 - [2026-09-14] Menampilkan tekstur serat kayu jati alami dengan pencahayaan alami pada prompt visual memperkuat kesan kualitas material premium untuk bisnis furniture custom.
 - [2026-09-14] Menampilkan alas pelindung lantai dan perkakas kerja yang tersusun rapi memberikan dorongan visual atas profesionalisme jasa perakitan mebel.
 - [2026-09-14] Menampilkan teknisi yang menggunakan alas lantai pelindung dan peralatan cordless modern meningkatkan impresi keprofesionalan jasa panggilan.
+- [2026-09-14] Untuk jasa rakit furniture panggilan, menampilkan adegan perakitan dengan alas pelindung lantai dan alat modern sangat efektif membangun kepercayaan konsumen.
+- [2026-09-14] Menampilkan sudut pandang proses perakitan furniture dengan alas pelindung lantai dan pencahayaan natural terbukti memperkuat kesan profesionalisme jasa panggilan lokal.
+- [2026-09-14] Untuk kategori jasa rakit furniture knockdown, menampilkan proses perakitan dengan alas pelindung lantai dan peralatan modern secara jelas sangat efektif dalam membangun kepercayaan konsumen lokal.

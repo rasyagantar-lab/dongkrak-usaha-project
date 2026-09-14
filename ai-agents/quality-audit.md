@@ -54,3 +54,6 @@ This file is your live rulebook: the application reads it fresh and shows it to 
 ## Model Registry Contract
 - AI_MODELS.md is the builder-owned source of truth for the audit model, key namespace, and fallback order.
 - The application injects the selected audit metadata at runtime; never use content, keyword, or orchestrator credentials.
+
+## Self-Improvement Log (auto-recorded)
+- [2026-09-14] Content with fully populated location, contact details, and precise local intent keywords achieves high publishing readiness effortlessly.

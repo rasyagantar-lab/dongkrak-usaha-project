@@ -102,3 +102,4 @@ Do not invent unavailable models, hidden tools, or unsupported APIs. Use only do
 - [2026-09-14] Menyoroti merek furniture populer seperti IKEA dan Informa bersama nama kota target Ciputat secara konsisten memperkuat relevansi pencarian lokal.
 - [2026-09-14] Menggabungkan nama merek furniture populer seperti IKEA dan Informa dengan nama lokasi spesifik Andir secara konsisten meningkatkan relevansi pencarian niat lokal.
 - [2026-09-14] Menyoroti nama merek furniture populer seperti IKEA dan Informa bersama lokasi spesifik Andir secara konsisten memperkuat relevansi pencarian niat lokal.
+- [2026-09-14] Menyoroti merek furniture populer seperti IKEA, Informa, dan Dekoruma bersama nama lokasi spesifik Antapani secara konsisten memperkuat relevansi pencarian niat lokal.

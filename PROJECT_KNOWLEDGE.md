@@ -423,6 +423,47 @@ Fix: the `<main>` wrapper is keyed on `activeTab + ':' + activeCampaign.id` -- e
 Verified: dropdown Andir -> Katering -> AC Servis -> Antapani; the name and address fields followed each time.
 Guide updated with a plain definition: one campaign = one listing to publish = business data + one target area + its AI outputs; the dropdown chooses which one every tab is working on; tab 3 runs the AI for that one, "Realisasikan" in Kepung Pasar runs the same engine for many.
 
+## EXPERIMENT (not a decision): Cloud Run deployment via GitHub, branch `experiment/cloud-run` (started 2026-09-14)
+Status: IN PROGRESS, UNVERIFIED. Nothing in this section is proven until stated otherwise. If it fails, the proven state is one command away -- see "Rollback" below. The LAN/single-laptop path remains the known-good way to run this app for the PKL team.
+
+Why: the user wants to try hosting the app so 4 PKL interns + a supervisor can use it from anywhere, and proposed handing the repo to AI Studio to deploy. Concerns the user raised, in their words: the deploying AI must not modify the files; will the API keys (especially the non-Google Cloudflare key) be a problem.
+
+Rollback (the whole point of this section):
+- `master` is commit `29781fe` = the proven local/LAN state (MD contracts live, market siege, Cloudflare base photo proven, splash, persistence, operator-feedback fixes). `git checkout master` returns to it. Nothing on the experiment branch is merged unless a real deploy succeeds AND the user says so.
+- `.env`, `data/`, `public/base-photos/`, `public/generated-images/` are git-ignored, so switching branches never touches campaigns, keys, or photos.
+- The experiment adds a storage layer (`server/storage.ts`) that stays in LOCAL mode unless `GCS_BUCKET` is set. With that variable absent, every code path is intended to behave exactly as on `master`; this is re-verified locally before any deploy (see verification below once done).
+
+Facts verified in code before starting (these are what make a naive "press deploy" fail):
+1. Container filesystem on Cloud Run is disposable (wiped on restart / scale-to-zero). Eight runtime disk writes exist: `data/campaigns.json`, `data/publish-history.json`, `public/base-photos/*`, `public/generated-images/*` (3 routes), the extension zip, and the agents' self-improvement notes in `ai-agents/*.md`. All would be lost -- the "campaigns vanished" bug made permanent.
+2. `const PORT = 3000` was hardcoded; Cloud Run injects `PORT` (8080) and kills containers that do not listen on it.
+3. The server reads NINE env vars (`GEMINI_API_KEY_ORCHESTRATOR/STRATEGY/KEYWORD/CONTENT/AUDIT/IMAGE/BITMAP`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN_BITMAP`). The AI Studio era injected only a single `GEMINI_API_KEY`, which this app deliberately no longer reads. On Cloud Run they must be set explicitly (console/secrets). The Cloudflare key itself is not a problem: to the server it is just an env var and an outbound HTTPS call.
+4. No Dockerfile existed; `npm start` runs `dist/server.cjs`, which only exists after `npm run build`.
+5. No git remote exists; Docker is not installed on this machine, so the image cannot be build-tested locally -- that verification is deferred to the first Cloud Build.
+6. The extension already whitelists `*.run.app` and a Cloud Run URL is https, so the mixed-content problem that blocks the LAN option does NOT apply here.
+7. "The deploying AI must not modify files": this cannot be guaranteed if an AI agent is in the deploy loop. The mitigation chosen: make the repo deploy cleanly with zero edits (Dockerfile, PORT, storage) and recommend Cloud Run's own "deploy from GitHub repository" path, which involves no AI agent at all. AI Studio is then only the place the Gemini keys come from.
+8. Billing: Cloud Run is believed to require a billing account on the GCP project even within the free tier. NOT verified here -- the user must check on the deploy screen. If it demands billing, that is the same card/KTP blocker as before and the experiment stops there.
+
+Planned changes on the branch (each recorded as done/verified when it is):
+- `server/storage.ts` (new): `readText/writeText/readBinary/writeBinary/list/remove`, local disk by default, GCS when `GCS_BUCKET` is set. Auth on Cloud Run via the service account (ADC), no key file.
+- server.ts: `PORT` from env; campaigns/history/base photos/generated images/self-improvement logs routed through storage; assets served by a route that reads from storage (URLs unchanged); startup log of storage mode + which env var NAMES are set (never values).
+- `Dockerfile` + `.dockerignore`; `DEPLOY_CLOUD_RUN.md` with exact console steps and a "do not modify" preamble aimed at any AI that reads the repo.
+
+Progress on branch `experiment/cloud-run` (2026-09-14, later the same day):
+
+DONE and VERIFIED LOCALLY:
+- `server/storage.ts` written; `server.ts` and `server/dongkrakusahaAdapter.ts` route every runtime write through it (campaigns, history, base photos, generated images, agent self-improvement logs). `PORT` now from env. Startup prints storage mode + which key NAMES are set. Dead `resolvePublicPath`/`BASE_PHOTO_DIR` removed.
+- Local-mode regression (no `GCS_BUCKET`): 33 campaigns intact incl. the user's Submitted Andir clone; base photo listed and served with CORS headers; traversal (`..%2F`) -> 400; compose read+write via storage landed on disk; convert-webp ok; history 200; status 8 features / 0 missing. Behaviour identical to master.
+- Production bundle run exactly as the container CMD (`NODE_ENV=production PORT=8080 node dist/server.cjs`): listened on 8080, served `dist/index.html`, loaded 33 campaigns, served assets through the route, and completed a REAL strategy-agent call (contracts read from `<cwd>/ai-agents`, matching the Dockerfile's `COPY ai-agents`). `npx tsc --noEmit` and `npm run build` clean.
+- `Dockerfile` (Node 22 Debian for sharp's glibc binaries; multi-stage; `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` so playwright-chromium's ~150MB browser is not pulled), `.dockerignore` (excludes node_modules, dist, data, .env*, artwork), `DEPLOY_CLOUD_RUN.md` (console steps, the 10 env vars, bucket IAM, max-instances=1, what the startup log must show), README rewritten (the old one told readers to set a single `GEMINI_API_KEY` in `.env.local` -- wrong var, wrong file -- exactly the kind of thing that invites an AI agent to "fix" the repo). Both README and DEPLOY carry a do-not-modify preamble aimed at AI agents.
+
+NOT VERIFIED (cannot be, from this machine):
+- The Docker image itself (Docker not installed here) -- first real build happens in Cloud Build.
+- GCS mode end to end. `server/storage.ts`'s gcs branch has never executed against a real bucket. Unknowns: ADC auth on the Cloud Run service account, `list()` metadata shape, `primeContractCache` merge with a populated bucket.
+- Whether the user's GCP project can enable billing at all (external blocker).
+- Design caveat to remember: in gcs mode the self-improvement log lives in the bucket and the RULES come from the image; editing `ai-agents/*.md` requires a redeploy to take effect. Documented in DEPLOY_CLOUD_RUN.md.
+
+Rollback unchanged: `git checkout master` (checkpoint `29781fe`). Local data untouched.
+
 ## Roadmap Completion Summary (2026-09-14)
 All four phases of the approved plan are implemented. Evidence status per phase:
 - Phase 1 MD contracts: PROVEN (sentinel twice, notes on disk, then real notes from a production siege run).

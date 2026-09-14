@@ -1,5 +1,4 @@
-import fs from 'fs';
-import path from 'path';
+import * as storage from './storage';
 import {
   Campaign,
   DongkrakUsahaListingData,
@@ -34,28 +33,15 @@ let currentConnectionConfig: DongkrakUsahaConnectionConfig = {
 // Publish history used to live only in RAM, so every server restart silently wiped
 // it back to empty. Restarts are routine during development, so real records were
 // being destroyed by ordinary work. History is now persisted to disk.
-const HISTORY_FILE = path.join(process.cwd(), 'data', 'publish-history.json');
+const HISTORY_KEY = 'data/publish-history.json';
 
-function loadHistoryFromDisk(): PublishRecord[] {
-  try {
-    if (!fs.existsSync(HISTORY_FILE)) return [];
-    const parsed = JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf-8'));
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (err) {
-    console.error('[History] Could not read stored history, starting empty:', err);
-    return [];
-  }
-}
-
-let publishRecordsStore: PublishRecord[] = loadHistoryFromDisk();
+// Storage-backed (local disk by default, GCS when GCS_BUCKET is set). Loaded once at
+// boot via loadHistory(); every mutation writes through.
+let publishRecordsStore: PublishRecord[] = [];
 
 function persistHistory() {
-  try {
-    fs.mkdirSync(path.dirname(HISTORY_FILE), { recursive: true });
-    fs.writeFileSync(HISTORY_FILE, JSON.stringify(publishRecordsStore, null, 2));
-  } catch (err) {
-    console.error('[History] Failed to persist history:', err);
-  }
+  const snapshot = JSON.stringify(publishRecordsStore, null, 2);
+  storage.writeText(HISTORY_KEY, snapshot).catch(err => console.error('[History] Failed to persist history:', err));
 }
 
 export class OfficialDongkrakUsahaAdapter implements DongkrakUsahaPublisher {
@@ -67,6 +53,17 @@ export class OfficialDongkrakUsahaAdapter implements DongkrakUsahaPublisher {
   public static setStoreConfig(config: DongkrakUsahaConnectionConfig): DongkrakUsahaConnectionConfig {
     currentConnectionConfig = { ...config, lastTested: new Date().toISOString() };
     return currentConnectionConfig;
+  }
+
+  public static async loadHistory(): Promise<void> {
+    try {
+      const text = await storage.readText(HISTORY_KEY);
+      const parsed = text === null ? [] : JSON.parse(text);
+      publishRecordsStore = Array.isArray(parsed) ? parsed : [];
+    } catch (err) {
+      console.error('[History] Could not read stored history, starting empty:', err);
+      publishRecordsStore = [];
+    }
   }
 
   public static getHistory(): PublishRecord[] {

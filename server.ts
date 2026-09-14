@@ -14,10 +14,13 @@ import {
   PublishResult 
 } from "./server/dongkrakusahaAdapter";
 import { INITIAL_CAMPAIGNS } from "./src/data/sampleBusinesses";
+import * as storage from "./server/storage";
 import { Campaign, PublishRecord } from "./src/types";
 
 const app = express();
-const PORT = 3000;
+// Cloud Run (and most PaaS hosts) inject the port to listen on via PORT. Locally it is
+// unset, so 3000 stays the dev default and nothing about the LAN/localhost flow changes.
+const PORT = Number(process.env.PORT) || 3000;
 
 app.use(express.json({ limit: '10mb' }));
 
@@ -28,30 +31,33 @@ const adapter = new OfficialDongkrakUsahaAdapter();
 // meant any restart -- which happens constantly during development -- silently threw
 // away real user work and reset the list back to the three samples. Campaigns are now
 // persisted to disk and the samples are only used to seed a first run.
-const CAMPAIGN_FILE = path.join(process.cwd(), "data", "campaigns.json");
+const CAMPAIGN_KEY = "data/campaigns.json";
 
-function loadCampaignsFromDisk(): Campaign[] {
+// Storage-backed (local disk by default, GCS when GCS_BUCKET is set -- see
+// server/storage.ts). Loaded once at boot in startServer(); the in-memory array stays
+// the working copy and every mutation writes through.
+let campaignsStore: Campaign[] = [...INITIAL_CAMPAIGNS];
+
+async function loadCampaigns(): Promise<void> {
   try {
-    if (!fs.existsSync(CAMPAIGN_FILE)) return [...INITIAL_CAMPAIGNS];
-    const parsed = JSON.parse(fs.readFileSync(CAMPAIGN_FILE, "utf-8"));
+    const text = await storage.readText(CAMPAIGN_KEY);
+    if (text === null) { campaignsStore = [...INITIAL_CAMPAIGNS]; return; }
+    const parsed = JSON.parse(text);
     // An empty stored array is a legitimate state (user deleted everything); only a
     // missing/corrupt file falls back to the samples.
-    return Array.isArray(parsed) ? parsed : [...INITIAL_CAMPAIGNS];
+    campaignsStore = Array.isArray(parsed) ? parsed : [...INITIAL_CAMPAIGNS];
   } catch (err) {
     console.error("[Campaigns] Could not read stored campaigns, seeding from samples:", err);
-    return [...INITIAL_CAMPAIGNS];
+    campaignsStore = [...INITIAL_CAMPAIGNS];
   }
 }
 
-let campaignsStore: Campaign[] = loadCampaignsFromDisk();
-
+// The serialisation happens synchronously (so concurrent mutations cannot interleave
+// with it); only the upload/write is async, and a failure is logged rather than thrown
+// so a storage hiccup never fails the user's request.
 function persistCampaigns() {
-  try {
-    fs.mkdirSync(path.dirname(CAMPAIGN_FILE), { recursive: true });
-    fs.writeFileSync(CAMPAIGN_FILE, JSON.stringify(campaignsStore, null, 2));
-  } catch (err) {
-    console.error("[Campaigns] Failed to persist campaigns:", err);
-  }
+  const snapshot = JSON.stringify(campaignsStore, null, 2);
+  storage.writeText(CAMPAIGN_KEY, snapshot).catch(err => console.error("[Campaigns] Failed to persist campaigns:", err));
 }
 
 type FeatureName = "orchestrator" | "content" | "keyword" | "audit" | "image" | "bitmap" | "strategy" | "webp";
@@ -773,14 +779,53 @@ const AGENT_CONTRACTS_DIR = path.join(process.cwd(), "ai-agents");
 const SELF_IMPROVEMENT_HEADING = "## Self-Improvement Log (auto-recorded)";
 const MAX_SELF_IMPROVEMENT_ENTRIES = 20;
 
-function loadAgentContract(contractFile: string): string {
-  const filePath = path.join(AGENT_CONTRACTS_DIR, contractFile);
+// In gcs mode the container filesystem is disposable, so the agents' auto-recorded
+// notes cannot live in the repo file. The RULES still come from the repo (baked into
+// the image; editing them = redeploy), while the log section is kept in the bucket and
+// merged in at boot. The merged text is cached in memory so appends stay a synchronous
+// read-modify-write (no interleaving), then uploaded asynchronously.
+const CONTRACT_CACHE = new Map<string, string>();
+const contractStorageKey = (contractFile: string) => `ai-agents/${contractFile}`;
+
+function readRepoContract(contractFile: string): string {
   try {
-    return fs.readFileSync(filePath, "utf-8");
+    return fs.readFileSync(path.join(AGENT_CONTRACTS_DIR, contractFile), "utf-8");
   } catch (err) {
     console.error(`[Agent Contract] Could not read ${contractFile}, proceeding without it:`, err);
     return "";
   }
+}
+
+function extractLogEntries(text: string): string[] {
+  const idx = text.indexOf(SELF_IMPROVEMENT_HEADING);
+  if (idx === -1) return [];
+  const rest = text.slice(idx + SELF_IMPROVEMENT_HEADING.length);
+  const next = rest.match(/\n(?=#{1,2}\s)/);
+  const body = next ? rest.slice(0, next.index) : rest;
+  return body.split("\n").map(l => l.trim()).filter(l => l.startsWith("- ["));
+}
+
+async function primeContractCache(): Promise<void> {
+  if (storage.STORAGE_MODE !== "gcs") return;
+  const files = Object.values(FEATURE_MODEL_REGISTRY).map(c => c.contractFile).filter((f): f is string => !!f);
+  for (const file of files) {
+    const repoText = readRepoContract(file).replace(/\r\n/g, "\n");
+    const bucketText = (await storage.readText(contractStorageKey(file)).catch(() => null)) || "";
+    // Fresh rules from the repo, previously recorded notes from the bucket.
+    const entries = extractLogEntries(bucketText);
+    const headIdx = repoText.indexOf(SELF_IMPROVEMENT_HEADING);
+    const rulesOnly = headIdx === -1 ? repoText : repoText.slice(0, headIdx);
+    const merged = entries.length
+      ? `${rulesOnly.replace(/\s+$/, "")}\n\n${SELF_IMPROVEMENT_HEADING}\n${entries.join("\n")}\n`
+      : repoText;
+    CONTRACT_CACHE.set(file, merged);
+  }
+  console.log(`[Agent Contract] gcs mode: ${files.length} contracts primed (repo rules + bucket logs).`);
+}
+
+function loadAgentContract(contractFile: string): string {
+  if (storage.STORAGE_MODE === "gcs") return CONTRACT_CACHE.get(contractFile) ?? readRepoContract(contractFile);
+  return readRepoContract(contractFile);
 }
 
 const SELF_IMPROVEMENT_INSTRUCTION = `
@@ -806,7 +851,9 @@ sepenuhnya -- jangan mengarang catatan hanya supaya field terisi.`;
 function appendSelfImprovementNote(contractFile: string, note: string): void {
   const filePath = path.join(AGENT_CONTRACTS_DIR, contractFile);
   try {
-    const raw = fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf-8") : "";
+    const raw = storage.STORAGE_MODE === "gcs"
+      ? (CONTRACT_CACHE.get(contractFile) ?? readRepoContract(contractFile))
+      : (fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf-8") : "");
     const current = raw.replace(/\r\n/g, "\n");
     const dateStamp = new Date().toISOString().slice(0, 10);
     const newEntry = `- [${dateStamp}] ${note.replace(/\s*\n\s*/g, " ").trim()}`;
@@ -833,7 +880,14 @@ function appendSelfImprovementNote(contractFile: string, note: string): void {
     }
 
     const capped = [...existingEntries, newEntry].slice(-MAX_SELF_IMPROVEMENT_ENTRIES);
-    fs.writeFileSync(filePath, `${head}${capped.join("\n")}\n${tail ? "\n" + tail : ""}`);
+    const updated = `${head}${capped.join("\n")}\n${tail ? "\n" + tail : ""}`;
+    if (storage.STORAGE_MODE === "gcs") {
+      CONTRACT_CACHE.set(contractFile, updated); // synchronous: the next call sees it immediately
+      storage.writeText(contractStorageKey(contractFile), updated)
+        .catch(err => console.error(`[Agent Contract] gcs upload failed for ${contractFile}:`, err));
+    } else {
+      fs.writeFileSync(filePath, updated);
+    }
     console.log(`[Agent Contract] ${contractFile}: self-improvement note recorded (${capped.length} entries).`);
   } catch (err) {
     console.error(`[Agent Contract] Failed to append self-improvement note to ${contractFile}:`, err);
@@ -1296,10 +1350,8 @@ app.post("/api/image/generate", async (req, res) => {
     }
 
     const extension = image.mimeType.includes("jpeg") ? "jpg" : image.mimeType.includes("webp") ? "webp" : "png";
-    const outputDir = path.join(process.cwd(), "public", "generated-images");
-    fs.mkdirSync(outputDir, { recursive: true });
     const fileName = `dongkrak-${Date.now()}.${extension}`;
-    fs.writeFileSync(path.join(outputDir, fileName), Buffer.from(image.data, "base64"));
+    await storage.writeBinary(`generated-images/${fileName}`, Buffer.from(image.data, "base64"));
     const storedPath = `/generated-images/${fileName}`;
 
     res.json({
@@ -1332,14 +1384,14 @@ app.post("/api/image/generate", async (req, res) => {
 // underlying photo stays a real product photo, which the audit agent's factual rules
 // prefer over a generated image of furniture that does not exist.
 
-const BASE_PHOTO_DIR = path.join(process.cwd(), "public", "base-photos");
-
-// Shared guard: a caller-supplied path must stay inside public/ (no traversal).
-function resolvePublicPath(candidate: string): string | null {
-  const publicRoot = path.resolve(process.cwd(), "public");
-  const resolved = path.resolve(publicRoot, candidate.replace(/^\/+/, ""));
-  if (resolved !== publicRoot && !resolved.startsWith(`${publicRoot}${path.sep}`)) return null;
-  return resolved;
+// Maps a public asset URL path ("/base-photos/x.jpg") to a storage key. Only the two
+// asset prefixes are allowed and any traversal is rejected, so a caller can never read
+// outside the asset space regardless of storage mode.
+function assetKeyFromPublicPath(candidate: string): string | null {
+  const cleaned = candidate.replace(/^\/+/, "").replace(/\\/g, "/");
+  if (cleaned.includes("..") || cleaned.includes("\0")) return null;
+  const ok = ["base-photos/", "generated-images/"].some(p => cleaned.startsWith(p) && cleaned.length > p.length);
+  return ok ? cleaned : null;
 }
 
 function slugifyCategory(value: string): string {
@@ -1418,10 +1470,9 @@ async function storeBasePhotoBuffer(category: string, raw: Buffer) {
     throw new BasePhotoError("File is not a readable image.", 400);
   }
 
-  fs.mkdirSync(BASE_PHOTO_DIR, { recursive: true });
   const fileName = `${slug}.jpg`;
   const normalised = await sharp(raw).jpeg({ quality: 90 }).toBuffer();
-  fs.writeFileSync(path.join(BASE_PHOTO_DIR, fileName), normalised);
+  await storage.writeBinary(`base-photos/${fileName}`, normalised);
 
   return {
     ok: true,
@@ -1623,18 +1674,18 @@ app.post("/api/image/generate-base-photo", async (req, res) => {
   }
 });
 
-app.get("/api/image/base-photos", (req, res) => {
+app.get("/api/image/base-photos", async (req, res) => {
   try {
-    if (!fs.existsSync(BASE_PHOTO_DIR)) return res.json({ basePhotos: [] });
-    const basePhotos = fs.readdirSync(BASE_PHOTO_DIR)
-      .filter(name => /\.(jpe?g|png|webp)$/i.test(name))
-      .map(name => {
-        const stat = fs.statSync(path.join(BASE_PHOTO_DIR, name));
+    const entries = await storage.list("base-photos/");
+    const basePhotos = entries
+      .filter(e => /\.(jpe?g|png|webp)$/i.test(e.key))
+      .map(e => {
+        const name = e.key.slice("base-photos/".length);
         return {
           slug: name.replace(/\.[^.]+$/, ""),
-          basePath: `/base-photos/${name}`,
-          bytes: stat.size,
-          updatedAt: stat.mtime.toISOString()
+          basePath: `/${e.key}`,
+          bytes: e.bytes,
+          updatedAt: e.updatedAt
         };
       });
     res.json({ basePhotos });
@@ -1655,14 +1706,15 @@ app.post("/api/image/compose", async (req, res) => {
     if (baseBase64 && typeof baseBase64 === "string") {
       sourceBuffer = Buffer.from(baseBase64.replace(/^data:image\/[^;]+;base64,/, ""), "base64");
     } else if (basePath && typeof basePath === "string") {
-      const resolved = resolvePublicPath(basePath);
-      if (!resolved) {
+      const key = assetKeyFromPublicPath(basePath);
+      if (!key) {
         return res.status(400).json({ error: "Base path must remain inside the public directory." });
       }
-      if (!fs.existsSync(resolved)) {
+      const found = await storage.readBinary(key);
+      if (!found) {
         return res.status(404).json({ error: "Base photo was not found. Upload one for this category first." });
       }
-      sourceBuffer = fs.readFileSync(resolved);
+      sourceBuffer = found;
     } else {
       return res.status(400).json({ error: "Provide basePath or baseBase64." });
     }
@@ -1687,10 +1739,8 @@ app.post("/api/image/compose", async (req, res) => {
     else pipeline = pipeline.png();
 
     const rendered = await pipeline.toBuffer();
-    const outputDir = path.join(process.cwd(), "public", "generated-images");
-    fs.mkdirSync(outputDir, { recursive: true });
     const fileName = `composed-${Date.now()}.${outputFormat === "jpeg" ? "jpg" : outputFormat}`;
-    fs.writeFileSync(path.join(outputDir, fileName), rendered);
+    await storage.writeBinary(`generated-images/${fileName}`, rendered);
 
     res.json({
       ok: true,
@@ -1719,16 +1769,16 @@ app.post("/api/image/convert-webp", async (req, res) => {
     if (sourceBase64 && typeof sourceBase64 === "string") {
       sourceBuffer = Buffer.from(sourceBase64.replace(/^data:image\/[^;]+;base64,/, ""), "base64");
     } else if (sourcePath && typeof sourcePath === "string") {
-      const publicRoot = path.resolve(process.cwd(), "public");
-      const requestedPath = path.resolve(publicRoot, sourcePath.replace(/^\/+/, ""));
-      if (requestedPath !== publicRoot && !requestedPath.startsWith(`${publicRoot}${path.sep}`)) {
+      const key = assetKeyFromPublicPath(sourcePath);
+      if (!key) {
         return res.status(400).json({ error: "Source path must remain inside the public directory." });
       }
-      if (!fs.existsSync(requestedPath)) {
+      const found = await storage.readBinary(key);
+      if (!found) {
         return res.status(404).json({ error: "Source image was not found." });
       }
-      sourceBuffer = fs.readFileSync(requestedPath);
-      originalPath = requestedPath;
+      sourceBuffer = found;
+      originalPath = `/${key}`;
     } else {
       return res.status(400).json({ error: "Provide sourcePath or sourceBase64." });
     }
@@ -1742,12 +1792,9 @@ app.post("/api/image/convert-webp", async (req, res) => {
       return res.status(400).json({ error: "Quality must be an integer between 1 and 100." });
     }
 
-    const outputDir = path.join(process.cwd(), "public", "generated-images");
-    fs.mkdirSync(outputDir, { recursive: true });
     const fileName = `dongkrak-${Date.now()}.webp`;
-    const outputPath = path.join(outputDir, fileName);
     const converted = await sharp(sourceBuffer).webp({ quality: numericQuality }).toBuffer();
-    fs.writeFileSync(outputPath, converted);
+    await storage.writeBinary(`generated-images/${fileName}`, converted);
 
     const metadata = await sharp(converted).metadata();
     res.json({
@@ -2309,20 +2356,44 @@ app.get("/api/dongkrakusaha/history", (req, res) => {
 // served file without them fails at `response.blob()` and the upload silently dies.
 // These two directories hold generated/uploaded listing artwork only -- no secrets --
 // so serving them with an open CORS header is safe and is what makes autopost work.
-const CORS_ASSET_DIRS = ["generated-images", "base-photos"];
-for (const dir of CORS_ASSET_DIRS) {
-  app.use(
-    `/${dir}`,
-    (req, res, next) => {
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
-      next();
-    },
-    express.static(path.join(process.cwd(), "public", dir))
-  );
-}
+// Served through the storage layer so the SAME URLs work in both modes (local disk or
+// GCS). URL shape is unchanged, which is what the extension and stored campaign image
+// URLs depend on.
+app.get(["/base-photos/:name", "/generated-images/:name"], async (req, res) => {
+  const prefix = req.path.startsWith("/base-photos/") ? "base-photos/" : "generated-images/";
+  const key = assetKeyFromPublicPath(prefix + req.params.name);
+  if (!key) return res.status(400).end();
+  try {
+    const data = await storage.readBinary(key);
+    if (!data) return res.status(404).end();
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    res.setHeader("Content-Type", storage.contentTypeFor(key));
+    res.setHeader("Cache-Control", "public, max-age=300");
+    res.send(data);
+  } catch (err: any) {
+    console.error("[Assets] read failed:", err);
+    res.status(500).end();
+  }
+});
 
 async function startServer() {
+  // Load persisted state before accepting traffic. In gcs mode this is the only way
+  // data survives a container restart; in local mode it is the same disk read as before.
+  await loadCampaigns();
+  await OfficialDongkrakUsahaAdapter.loadHistory();
+  await primeContractCache();
+
+  // Startup summary: storage mode and which provider slots are configured -- NAMES
+  // only, never values. This is the first thing to read in Cloud Run logs when an
+  // agent reports "not configured".
+  const configured = Object.values(FEATURE_MODEL_REGISTRY)
+    .filter(c => c.provider === "gemini")
+    .map(c => `${c.apiKeyEnv}=${process.env[c.apiKeyEnv]?.trim() ? "set" : "MISSING"}`);
+  console.log(`[Startup] storage=${storage.STORAGE_MODE}${storage.STORAGE_MODE === "gcs" ? ` bucket=${process.env.GCS_BUCKET}` : ""} node_env=${process.env.NODE_ENV || "development"}`);
+  console.log(`[Startup] keys: ${configured.join(", ")}`);
+  console.log(`[Startup] cloudflare: ${process.env.CLOUDFLARE_ACCOUNT_ID?.trim() && process.env.CLOUDFLARE_API_TOKEN_BITMAP?.trim() ? "set" : "not configured"}`);
+
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },

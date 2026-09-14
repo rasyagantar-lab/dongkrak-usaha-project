@@ -1,0 +1,13 @@
+node_modules
+dist
+.git
+.gitignore
+data
+.env
+.env.*
+!.env.example
+public/base-photos
+public/generated-images
+public/dongkrakusaha-publisher-extension.zip
+*.log
+.claude

@@ -27,6 +27,10 @@ Never write an API key, token, cookie, or credential value into any markdown or 
 - `public/extension/` is the only extension source of truth.
 - Campaign/history data persists in `data/`; `public/base-photos/` and `public/generated-images/` hold user artwork. All git-ignored.
 
+## Branches (as of 2026-09-14)
+- `master` = proven local/LAN state (checkpoint `29781fe`). `experiment/cloud-run` = Cloud Run hosting experiment, UNVERIFIED. Do not merge the experiment into master without a successful real deploy and the user's say-so. Read the "EXPERIMENT" section in PROJECT_KNOWLEDGE.md before touching either.
+- Storage mode is decided solely by the `GCS_BUCKET` env var (`server/storage.ts`): absent = local disk, exactly as master behaves.
+
 ## UI conventions
 - Tailwind utilities only for animation (`transition-*`, `duration-*`, `motion-reduce:`). The `motion`/`framer-motion` package is not used; do not introduce it.
 - Animate only `transform` and `opacity`. No `backdrop-filter: blur()`. Target hardware is ≤8GB-RAM laptops with integrated GPUs.
