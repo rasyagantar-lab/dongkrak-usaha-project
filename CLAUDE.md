@@ -27,6 +27,11 @@ Never write an API key, token, cookie, or credential value into any markdown or 
 - `public/extension/` is the only extension source of truth.
 - Campaign/history data persists in `data/`; `public/base-photos/` and `public/generated-images/` hold user artwork. All git-ignored.
 
+## Roles (set by the user, 2026-09-15)
+- This repo (and the developer working in it) is the ONLY source of code changes: development, debugging, verification, documentation.
+- Google AI Studio is **hosting only**. It runs the app; it does not develop it. Never adopt edits from an AI Studio export back into this repo -- if its copy drifts, re-push ours. Its exports have been shown to alter `server.ts`, `.env.example`, and drop the `Dockerfile` (see PROJECT_KNOWLEDGE.md, EXPERIMENT section).
+- Deploy direction is one-way: repo -> AI Studio. Verify each deploy by its `[Startup]` log lines, never by AI Studio's own claims.
+
 ## Branches (as of 2026-09-14)
 - `master` = proven local/LAN state (checkpoint `29781fe`). `experiment/cloud-run` = Cloud Run hosting experiment, UNVERIFIED. Do not merge the experiment into master without a successful real deploy and the user's say-so. Read the "EXPERIMENT" section in PROJECT_KNOWLEDGE.md before touching either.
 - Storage mode is decided solely by the `GCS_BUCKET` env var (`server/storage.ts`): absent = local disk, exactly as master behaves.

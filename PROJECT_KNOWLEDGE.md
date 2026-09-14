@@ -490,6 +490,11 @@ The user relayed the diff findings to AI Studio; it replied that everything was 
 Remaining unrequested edits in the export: `index.html` title/meta (cosmetic) and the playwright removal. Neither adopted; our branch is unchanged and already contains everything correct plus the Dockerfile.
 Conclusion: after correction, AI Studio's copy is functionally equal to `experiment/cloud-run` minus the Dockerfile. The sound path forward is unchanged: push OUR branch to GitHub (it has the Dockerfile) and deploy through Cloud Run itself with `GCS_BUCKET` set; or, if staying inside AI Studio, set `GCS_BUCKET` + bucket IAM in its environment and confirm the startup log flips to `storage=gcs`. The experiment is still UNVERIFIED end to end -- no `storage=gcs` log line has been seen yet.
 
+### Working arrangement fixed by the user (2026-09-15)
+- Working rules unchanged (read MD before, record after, evidence-first).
+- Claude in this repo = app developer AND debugger. AI Studio = cloud host ONLY. It is not a developer and its edits are never merged back; the repo is the single source of truth and deploys flow one way, repo -> AI Studio.
+- Next: the user will propose the next update tomorrow. The cloud experiment stays open and UNVERIFIED until a `storage=gcs` startup log is seen.
+
 ## Roadmap Completion Summary (2026-09-14)
 All four phases of the approved plan are implemented. Evidence status per phase:
 - Phase 1 MD contracts: PROVEN (sentinel twice, notes on disk, then real notes from a production siege run).
