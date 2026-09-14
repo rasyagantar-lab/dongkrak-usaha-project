@@ -478,6 +478,18 @@ Untouched: `ai-agents/*.md`, `server/storage.ts`, `server/dongkrakusahaAdapter.t
 Assessment: exactly the failure mode predicted in the experiment's opening entry (item 7). The README/DEPLOY notices are requests, not controls. Whether the deployed app is usable depends on two things the diff cannot tell: (a) whether the user set the 7 per-agent keys + Cloudflare vars (else everything runs on the one injected key), and (b) whether `GCS_BUCKET` and bucket IAM were set on the underlying Cloud Run service (else storage=local on an ephemeral disk and all data vanishes on restart -- the original blocker, unaddressed).
 Decision so far: none of AI Studio's edits are adopted. The repo's `experiment/cloud-run` branch is unchanged. Next evidence needed: the service's `[Startup]` log lines.
 
+### Round 2: AI Studio's corrections, verified against its second export (2026-09-14, late evening)
+The user relayed the diff findings to AI Studio; it replied that everything was reverted. Its claims were checked by diffing its NEW export (`dongkrak-usaha-project (1).zip`) against the originally sent zip, in a scratch folder, nothing merged:
+- PORT restored to `Number(process.env.PORT) || 3000` -- TRUE (only the comment was reworded; `getFeatureApiKey` now returns `value.trim()`, harmless).
+- Global `GEMINI_API_KEY` fallback removed -- TRUE. `server.ts` is otherwise identical to ours.
+- "Dockerfile was never deleted, 100% intact" -- FALSE for the export: `Dockerfile` is absent from BOTH exports (as is `bun.lock`). Whether it exists inside AI Studio's workspace cannot be checked from here; the artifact the user would push does not contain it.
+- `package-lock.json` regenerated -- TRUE and sound: lockfile v3, `@google-cloud/storage 8.1.0`, `sharp 0.35.4`, `@huggingface/inference 4.13.28`, `@google/genai 2.22.0` all present; `playwright-chromium` removed consistently with `package.json` (harmless -- never imported by the server).
+- `.env.example` restored -- TRUE: comments back (19 lines), `GCS_BUCKET` documented, no global `GEMINI_API_KEY=`.
+- Reported status `sharedKeys: []` with 7 distinct fingerprints -- consistent with reality: three of the fingerprints (`c0ae293ad8a9` image, `e0a84ecf2d77` bitmap, `f4e7e70c6aaf` strategy) match the user's real keys as seen locally earlier the same day. The user must have entered all 7 keys + Cloudflare in AI Studio's environment settings, which also means custom env vars ARE settable there.
+- Its startup log: `storage=local node_env=development ... running on :3000`. This is AI Studio's DEV SANDBOX (`npm run dev` under vite middleware), not a production Cloud Run deployment. Data there is still ephemeral, and `GCS_BUCKET` is unset.
+Remaining unrequested edits in the export: `index.html` title/meta (cosmetic) and the playwright removal. Neither adopted; our branch is unchanged and already contains everything correct plus the Dockerfile.
+Conclusion: after correction, AI Studio's copy is functionally equal to `experiment/cloud-run` minus the Dockerfile. The sound path forward is unchanged: push OUR branch to GitHub (it has the Dockerfile) and deploy through Cloud Run itself with `GCS_BUCKET` set; or, if staying inside AI Studio, set `GCS_BUCKET` + bucket IAM in its environment and confirm the startup log flips to `storage=gcs`. The experiment is still UNVERIFIED end to end -- no `storage=gcs` log line has been seen yet.
+
 ## Roadmap Completion Summary (2026-09-14)
 All four phases of the approved plan are implemented. Evidence status per phase:
 - Phase 1 MD contracts: PROVEN (sentinel twice, notes on disk, then real notes from a production siege run).
