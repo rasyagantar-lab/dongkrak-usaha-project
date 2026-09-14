@@ -19,6 +19,267 @@ const isExtensionContextValid = () => {
   }
 };
 
+const normalizeAutopostText = (value) => String(value ?? '').trim();
+const normalizeFieldToken = (value) => normalizeAutopostText(value).toLowerCase().replace(/[^a-z0-9]+/g, '');
+
+const getFieldSignature = (element) => {
+  const labels = [];
+  if (element.id) {
+    document.querySelectorAll(`label[for="${CSS.escape(element.id)}"]`).forEach((label) => labels.push(label.textContent || ''));
+  }
+  const parentLabel = element.closest('label');
+  if (parentLabel) labels.push(parentLabel.textContent || '');
+  const previousLabel = element.previousElementSibling?.tagName?.toLowerCase() === 'label'
+    ? element.previousElementSibling.textContent
+    : '';
+  const surroundingText = element.parentElement?.textContent || '';
+  const ancestorText = Array.from({ length: 3 }, (_, index) => {
+    let node = element;
+    for (let step = 0; step <= index && node; step++) node = node.parentElement;
+    return node?.textContent || '';
+  }).join(' ');
+  return [
+    element.name,
+    element.id,
+    element.getAttribute('aria-label'),
+    element.getAttribute('placeholder'),
+    element.getAttribute('title'),
+    element.getAttribute('data-label'),
+    ...labels,
+    previousLabel,
+    surroundingText,
+    ancestorText
+  ].filter(Boolean).join(' ').toLowerCase();
+};
+
+const findAutopostField = (signatures, exactNames = [], allowHidden = false) => {
+  const controls = Array.from(document.querySelectorAll('input, textarea, select'));
+  const exactTokens = exactNames.map(normalizeFieldToken).filter(Boolean);
+  const exactMatch = controls.find((element) => {
+    if (element.disabled || element.readOnly || (!allowHidden && element.type === 'hidden')) return false;
+    return exactTokens.includes(normalizeFieldToken(element.name)) || exactTokens.includes(normalizeFieldToken(element.id));
+  });
+  if (exactMatch) return exactMatch;
+
+  const normalizedSignatures = signatures.map(normalizeFieldToken).filter(Boolean);
+  return controls
+    .map((element) => {
+    if (element.disabled || element.readOnly || (!allowHidden && element.type === 'hidden')) return false;
+      const signature = getFieldSignature(element);
+      const normalizedSignature = normalizeFieldToken(signature);
+      const score = normalizedSignatures.reduce((best, candidate) => {
+        if (normalizedSignature.includes(candidate)) return Math.max(best, candidate.length * 2);
+        return best;
+      }, 0);
+      return score > 0 ? { element, score } : false;
+    })
+    .filter(Boolean)
+    .sort((left, right) => right.score - left.score)[0]?.element || null;
+};
+
+const setNativeFieldValue = (element, value) => {
+  const nextValue = normalizeAutopostText(value);
+  if (element.tagName.toLowerCase() === 'select') {
+    const normalizedValue = normalizeFieldToken(nextValue);
+    const options = Array.from(element.options).filter((item) => item.value || item.textContent.trim());
+    const option = options.find((item) =>
+      normalizeFieldToken(item.value) === normalizedValue || normalizeFieldToken(item.textContent) === normalizedValue
+    ) || options.find((item) => {
+      const optionToken = normalizeFieldToken(`${item.value} ${item.textContent}`);
+      return optionToken.includes(normalizedValue) || normalizedValue.includes(optionToken);
+    });
+    if (!option) return false;
+    element.value = option.value;
+  } else {
+    const prototype = element.tagName.toLowerCase() === 'textarea' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    const setter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
+    setter?.call(element, nextValue);
+  }
+  element.dispatchEvent(new Event('input', { bubbles: true }));
+  element.dispatchEvent(new Event('change', { bubbles: true }));
+  return true;
+};
+
+const escapeHtml = (value) => normalizeAutopostText(value)
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#039;');
+
+const setDescriptionFieldValue = (textarea, value) => {
+  const nextValue = normalizeAutopostText(value);
+  if (!nextValue) return false;
+  const html = nextValue.split(/\n\s*\n/).map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, '<br>')}</p>`).join('');
+  let updated = false;
+
+  if (textarea?.id && typeof window.CKEDITOR !== 'undefined' && window.CKEDITOR.instances?.[textarea.id]) {
+    window.CKEDITOR.instances[textarea.id].setData(html);
+    updated = true;
+  }
+
+  const editorFrames = Array.from(document.querySelectorAll('iframe.cke_wysiwyg_frame, iframe[src="javascript:false"], iframe[title*="Rich Text Editor"]'));
+  const editorFrame = editorFrames.find((frame) => {
+    const container = frame.closest('.cke, .cke_inner, .editor, .form-group');
+    return textarea?.id ? Boolean(container?.querySelector(`#${CSS.escape(textarea.id)}`)) : true;
+  }) || (textarea ? textarea.parentElement?.querySelector('iframe') : null);
+  const editorBody = editorFrame?.contentDocument?.body;
+  if (editorBody) {
+    editorBody.innerHTML = html;
+    editorBody.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: nextValue }));
+    editorBody.dispatchEvent(new Event('change', { bubbles: true }));
+    updated = true;
+  }
+
+  if (textarea) {
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+    setter?.call(textarea, nextValue);
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    textarea.dispatchEvent(new Event('change', { bubbles: true }));
+    updated = true;
+  }
+  return updated;
+};
+
+const uploadCampaignImage = async (campaign) => {
+  const imageUrl = campaign?.dongkrakListingData?.images?.[0] || campaign?.businessData?.images?.[0];
+  const fileInput = document.querySelector('input[type="file"]#file, input[type="file"][name="file"], input[type="file"]');
+  if (!imageUrl) return { ready: false, error: 'IMAGE_SOURCE_MISSING' };
+  if (!fileInput) return { ready: false, error: 'IMAGE_INPUT_NOT_FOUND' };
+
+  try {
+    const response = await fetch(imageUrl, { credentials: 'omit' });
+    if (!response.ok) return { ready: false, error: `IMAGE_DOWNLOAD_FAILED_${response.status}` };
+    const blob = await response.blob();
+    const extension = (blob.type.split('/')[1] || 'jpeg').replace('jpeg', 'jpg');
+    const file = new File([blob], `dongkrak-upload-${Date.now()}.${extension}`, { type: blob.type || 'image/jpeg' });
+    const transfer = new DataTransfer();
+    transfer.items.add(file);
+    fileInput.files = transfer.files;
+    fileInput.dispatchEvent(new Event('input', { bubbles: true }));
+    fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+    return { ready: true, fileName: file.name, bytes: file.size, source: imageUrl };
+  } catch (error) {
+    return { ready: false, error: error?.message || 'IMAGE_UPLOAD_FAILED' };
+  }
+};
+
+const setCategoryFieldValue = (select, value) => {
+  if (!select || select.tagName.toLowerCase() !== 'select') return false;
+  const targetToken = normalizeFieldToken(value);
+  const targetWords = normalizeAutopostText(value).toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length > 2);
+  const options = Array.from(select.options).filter((option) => option.value || option.textContent.trim());
+  const ranked = options.map((option) => {
+    const optionText = `${option.value} ${option.textContent}`.toLowerCase();
+    const optionToken = normalizeFieldToken(optionText);
+    const overlap = targetWords.filter((word) => optionText.includes(word)).length;
+    const exact = optionToken === targetToken ? 1000 : 0;
+    const contained = optionToken && targetToken && (optionToken.includes(targetToken) || targetToken.includes(optionToken)) ? 500 : 0;
+    return { option, score: exact + contained + overlap * 10 };
+  }).sort((left, right) => right.score - left.score);
+  const best = ranked[0];
+  if (!best || best.score === 0) return false;
+
+  select.value = best.option.value;
+  select.dispatchEvent(new Event('input', { bubbles: true }));
+  select.dispatchEvent(new Event('change', { bubbles: true }));
+
+  const root = select.parentElement || document;
+  const searchInput = root.querySelector('input[type="search"], input[autocomplete="off"], .select2-search__field');
+  if (searchInput && searchInput.offsetParent !== null) {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    setter?.call(searchInput, best.option.textContent.trim());
+    searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+    searchInput.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'Enter' }));
+  }
+
+  const optionLabel = best.option.textContent.trim().toLowerCase();
+  const customOptions = Array.from(document.querySelectorAll(
+    '.select2-results__option, .chosen-results li, .dropdown-menu li, [role="option"]'
+  )).filter((item) => item.offsetParent !== null && item.textContent.trim().toLowerCase() === optionLabel);
+  customOptions[0]?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+  customOptions[0]?.click();
+  return true;
+};
+
+const resolvePlatformCategory = (campaign) => {
+  const business = campaign?.businessData || {};
+  const content = campaign?.generatedContent || {};
+  const listing = campaign?.dongkrakListingData || {};
+  const source = normalizeAutopostText(listing.kategori || content.mappedCategory || business.category);
+  const businessText = `${business.name || ''} ${business.category || ''} ${business.description || ''} ${(business.productsServices || []).join(' ')}`.toLowerCase();
+  if (/furniture|mebel|rakit|lemari|kitchen set/.test(businessText)) return 'Furniture';
+  return source;
+};
+
+const detectAutopostCaptcha = () => {
+  const bodyText = document.body?.innerText?.toLowerCase() || '';
+  return Boolean(document.querySelector('[class*="captcha"], [id*="captcha"], iframe[src*="recaptcha"], iframe[src*="hcaptcha"]')) ||
+    bodyText.includes('recaptcha') || bodyText.includes('hcaptcha') || bodyText.includes('captcha');
+};
+
+const autofillCampaign = async (campaign) => {
+  if (!campaign || typeof campaign !== 'object') return { success: false, error: 'INVALID_CAMPAIGN_PAYLOAD' };
+  const business = campaign.businessData || {};
+  const content = campaign.generatedContent || {};
+  const listing = campaign.dongkrakListingData || {};
+  const values = [
+    { key: 'namaProduk', exactNames: ['produk'], signatures: ['namaproduk', 'nama_produk', 'nama produk', 'title', 'judul'], value: listing.namaProduk || content.seoTitle || business.name },
+    { key: 'kategori', exactNames: ['kategori'], signatures: ['kategori', 'category', 'jenis usaha', 'jenis bisnis', 'tipe usaha'], value: resolvePlatformCategory(campaign) },
+    { key: 'penawaran', exactNames: ['penawaran'], signatures: ['penawaran', 'offer', 'snippet'], value: listing.penawaran || content.shortSnippet },
+    { key: 'deskripsi', exactNames: ['deskripsi'], signatures: ['deskripsi', 'description', 'seo_description', 'seo description'], value: listing.deskripsi || content.seoDescription || business.description },
+    { key: 'metaKeyword', exactNames: ['keyword'], signatures: ['metakeyword', 'meta_keyword', 'meta keyword', 'keyword'], value: listing.metaKeyword || business.mainKeyword },
+    { key: 'metaDeskripsi', exactNames: ['metadesc'], signatures: ['metadeskripsi', 'meta_deskripsi', 'meta_desc', 'metadesc', 'meta-description', 'description_meta', 'deskripsi_meta', 'deskripsi meta', 'meta description', 'meta desc', 'seo desc', 'description seo'], value: listing.metaDeskripsi || content.metaDescription },
+    { key: 'noWhatsApp', exactNames: ['no_wa'], signatures: ['nowhatsapp', 'no_whatsapp', 'whatsapp', 'phone', 'telepon'], value: listing.noWhatsApp || business.phoneWhatsApp }
+  ];
+  const filled = [];
+  const missing = [];
+  const missingDetails = [];
+  const matchedSelectors = [];
+  values.forEach((item) => {
+    if (!normalizeAutopostText(item.value)) return;
+    const field = findAutopostField(item.signatures, item.exactNames, item.key === 'deskripsi');
+    const didSet = item.key === 'kategori'
+      ? setCategoryFieldValue(field, item.value)
+      : item.key === 'deskripsi'
+        ? setDescriptionFieldValue(field, item.value)
+        : Boolean(field && setNativeFieldValue(field, item.value));
+    if (didSet) {
+      filled.push(item.key);
+      matchedSelectors.push({ key: item.key, selector: getElementUniqueSelector(field), name: field.name, id: field.id });
+    }
+    else {
+      missing.push(item.key);
+      missingDetails.push({
+        key: item.key,
+        valuePresent: Boolean(normalizeAutopostText(item.value)),
+        signatures: item.signatures,
+        exactNames: item.exactNames,
+        options: field?.tagName?.toLowerCase() === 'select' ? Array.from(field.options).map((option) => ({ value: option.value, label: option.textContent.trim() })) : []
+      });
+    }
+  });
+  const image = await uploadCampaignImage(campaign);
+  if (!image.ready) missing.push('image');
+
+  return {
+    success: true,
+    mode: 'DRY_RUN_FILLED_WAITING_CONFIRMATION',
+    captchaDetected: detectAutopostCaptcha(),
+    filled,
+    missing,
+    missingDetails,
+    matchedSelectors,
+    imageReady: image.ready,
+    image,
+    filledCount: filled.length,
+    missingCount: missing.length,
+    pageUrl: window.location.href,
+    formDetected: Boolean(findAuthoritativeProductForm()?.element),
+    message: 'Campaign fields filled. User confirmation is required before submit.'
+  };
+};
+
 // Clean up previous window message listener if bridge was re-injected
 if (window.__DONGKRAK_BRIDGE_LISTENER__) {
   try {
@@ -101,6 +362,34 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
       const fieldsCount = inspectionResult.fieldsDiscovered ? inspectionResult.fieldsDiscovered.length : 0;
       console.log("[DONGKRAKUSAHA CONTENT SCRIPT] FIELDS_DISCOVERED =", fieldsCount);
       sendResponse(inspectionResult);
+    } else if (request.action === 'AUTOFILL_CAMPAIGN') {
+      autofillCampaign(request.campaign).then(sendResponse).catch((error) => sendResponse({ success: false, error: error.message || 'AUTOFILL_FAILED' }));
+      return true;
+    } else if (request.action === 'SUBMIT_CAMPAIGN') {
+      const captchaDetected = detectAutopostCaptcha();
+      if (captchaDetected) {
+        sendResponse({ success: false, error: 'CAPTCHA_DETECTED', captchaDetected: true });
+        return false;
+      }
+      const form = findAuthoritativeProductForm();
+      const submitControl = form.element.querySelector('button[type="submit"], input[type="submit"], button:not([type]), input[name*="simpan"], input[value*="Simpan"], input[value*="SIMPAN"]');
+      if (!submitControl) {
+        sendResponse({ success: false, error: 'SUBMIT_CONTROL_NOT_FOUND' });
+        return false;
+      }
+      let submitMethod = 'click';
+      try {
+        if (typeof form.element.requestSubmit === 'function') {
+          form.element.requestSubmit(submitControl);
+          submitMethod = 'requestSubmit';
+        } else {
+          form.element.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+          submitControl.click();
+        }
+      } catch (submitError) {
+        submitControl.click();
+      }
+      sendResponse({ success: true, submitted: false, dispatched: true, mode: 'SUBMITTED', submitMethod, formSelector: form.selector, message: 'Submit event dispatched. Publish is not confirmed until a success URL or page confirmation is detected.' });
     } else if (request.action === 'STATE_UPDATED') {
       const payload = request.payload || request.state || {};
       const dongkrakState = payload.dongkrakState || payload;
@@ -293,6 +582,30 @@ const handleWindowMessage = (event) => {
   if (event.data.type === 'DONGKRAK_REAL_EXT_OPEN_FORM') {
     if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
       chrome.runtime.sendMessage({ action: 'OPEN_DONGKRAK_PRODUCT_FORM' });
+    }
+  }
+
+  if (event.data.type === 'DONGKRAK_AUTOFILL_CAMPAIGN' || event.data.type === 'DONGKRAK_SUBMIT_CAMPAIGN') {
+    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+      chrome.runtime.sendMessage({
+        action: event.data.type === 'DONGKRAK_AUTOFILL_CAMPAIGN' ? 'AUTOFILL_CAMPAIGN' : 'SUBMIT_CAMPAIGN',
+        campaign: event.data.campaign,
+        requestId: event.data.requestId || `autopost-${Date.now()}`
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          window.postMessage({
+            type: event.data.type === 'DONGKRAK_AUTOFILL_CAMPAIGN' ? 'DONGKRAK_AUTOFILL_RESULT' : 'DONGKRAK_SUBMIT_RESULT',
+            requestId: event.data.requestId,
+            payload: { success: false, error: chrome.runtime.lastError.message || 'RUNTIME_MESSAGE_FAILED' }
+          }, '*');
+          return;
+        }
+        window.postMessage({
+          type: event.data.type === 'DONGKRAK_AUTOFILL_CAMPAIGN' ? 'DONGKRAK_AUTOFILL_RESULT' : 'DONGKRAK_SUBMIT_RESULT',
+          requestId: event.data.requestId,
+          payload: response || { success: false, error: 'EMPTY_EXTENSION_RESPONSE' }
+        }, '*');
+      });
     }
   }
 };

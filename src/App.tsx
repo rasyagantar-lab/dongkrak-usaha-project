@@ -1,14 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { BusinessManager } from './components/BusinessManager';
-import { SeoResearch } from './components/SeoResearch';
-import { ContentGenerator } from './components/ContentGenerator';
-import { QualityControlAudit } from './components/QualityControlAudit';
+// ContentGenerator and QualityControlAudit are no longer mounted: their work moved
+// into the orchestrator pipeline. The files are kept for now rather than deleted, so
+// the old single-agent prompts stay recoverable if a manual rerun is ever wanted.
 import { DongkrakUsahaPreview } from './components/DongkrakUsahaPreview';
 import { PublishingHub } from './components/PublishingHub';
 import { ConnectionSettings } from './components/ConnectionSettings';
 import { PublishingHistory } from './components/PublishingHistory';
 import { ModelStatusIndicator } from './components/ModelStatusIndicator';
+import { OrchestratorPanel } from './components/OrchestratorPanel';
+import { VisualAssetStudio } from './components/VisualAssetStudio';
+import { MarketSiegePanel } from './components/MarketSiegePanel';
+import { WelcomeSplash } from './components/WelcomeSplash';
+import { GettingStartedGuide } from './components/GettingStartedGuide';
 import { INITIAL_CAMPAIGNS } from './data/sampleBusinesses';
 import { Campaign, DongkrakUsahaConnectionConfig } from './types';
 
@@ -53,6 +58,78 @@ export default function App() {
   }, []);
 
   const activeCampaign = campaigns.find(c => c.id === activeCampaignId) || campaigns[0];
+
+  // Tracks which campaign is awaiting an autopost submit result. Lives at the App
+  // root (never unmounts while the SPA is open) so switching tabs right after
+  // clicking Submit can't cause the DONGKRAK_SUBMIT_RESULT response to be missed --
+  // it previously lived inside PublishingHub, which unmounts on tab navigation.
+  //
+  // NOTE: this used to also auto-detect a "public listing URL" from a later
+  // STATE_UPDATED broadcast and call mark-published automatically. That was removed
+  // (see PROJECT_KNOWLEDGE.md "Share web" / platform constraint finding, 2026-09-13):
+  // DongkrakUsaha does not navigate to a public listing URL after submit at all --
+  // it returns to the admin product list, and the real public URL is only obtainable
+  // ~24h later through a separate platform-gated action. So there is no such
+  // broadcast to detect. Submit success is now recorded immediately as 'Submitted'
+  // (real, proven evidence: dispatch + image upload succeeded), and the real public
+  // URL is added later via the existing manual "Tandai Selesai" flow once available.
+  const pendingAutopostCampaignRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const handleGlobalExtensionMessage = (event: MessageEvent) => {
+      if (!event.data || event.data.type !== 'DONGKRAK_SUBMIT_RESULT') return;
+      const campaignId = pendingAutopostCampaignRef.current;
+      if (!campaignId) return;
+
+      const payload = event.data.payload || {};
+      pendingAutopostCampaignRef.current = null;
+      if (!payload.success || !payload.dispatched) return;
+
+      fetch('/api/dongkrakusaha/mark-submitted', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaignId })
+      }).then(async (response) => {
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.errorMessage || 'Gagal mencatat submit');
+        setCampaigns(prev => prev.map(c => c.id === data.campaign.id ? data.campaign : c));
+      }).catch((error: any) => {
+        console.warn('Submit bookkeeping failed:', error.message);
+      });
+    };
+
+    window.addEventListener('message', handleGlobalExtensionMessage);
+    return () => window.removeEventListener('message', handleGlobalExtensionMessage);
+  }, []);
+
+  // Re-pull the full campaign list from the server. Used after server-side bulk
+  // operations (market-siege drafting) that create records the client never built.
+  const handleReloadCampaigns = async () => {
+    try {
+      const res = await fetch('/api/campaigns');
+      if (!res.ok) return;
+      const loaded: Campaign[] = await res.json();
+      if (Array.isArray(loaded) && loaded.length > 0) {
+        setCampaigns(loaded);
+        setActiveCampaignId(prev => (loaded.some(c => c.id === prev) ? prev : loaded[0].id));
+      }
+    } catch (err) {
+      console.warn('Failed to reload campaigns from server:', err);
+    }
+  };
+
+  const handleDeleteCampaign = async (target: Campaign) => {
+    const label = target.siegeTargetArea ? `${target.businessData.name} — ${target.siegeTargetArea}` : target.businessData.name;
+    if (!window.confirm(`Hapus campaign "${label}"? Tidak bisa dibatalkan.`)) return;
+    try {
+      const res = await fetch(`/api/campaigns/${target.id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) { window.alert(data.error || 'Gagal menghapus.'); return; }
+      await handleReloadCampaigns();
+    } catch (err: any) {
+      window.alert(err?.message || 'Gagal menghapus.');
+    }
+  };
 
   // Sync campaign updates to backend
   const handleUpdateCampaign = async (updatedCampaign: Campaign) => {
@@ -137,6 +214,8 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 flex flex-col font-sans">
+      <WelcomeSplash />
+
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -146,36 +225,46 @@ export default function App() {
         connectionConfig={connectionConfig}
       />
 
-      <main className="flex-1 p-4 sm:p-6 lg:p-8">
+      {/* Keyed on BOTH the tab and the active campaign. Every per-campaign panel seeds
+          local state from the campaign prop once on mount (form fields, orchestrator
+          results, caption drafts); without the campaign id in the key, switching
+          campaigns in the header dropdown left the old campaign's data on screen --
+          and "Terapkan ke Campaign" could write campaign A's results into campaign B.
+          Remounting also re-triggers the short settle-in animation. */}
+      <main key={`${activeTab}:${activeCampaign?.id || ''}`} className="flex-1 p-4 sm:p-6 lg:p-8 animate-du-panel-in motion-reduce:animate-none">
+        {activeTab === 'orchestrator' && (
+          <OrchestratorPanel
+            campaign={activeCampaign}
+            onUpdateCampaign={handleUpdateCampaign}
+          />
+        )}
+
+        {activeTab === 'business' && (
+          <div className="max-w-5xl mx-auto mb-6">
+            <GettingStartedGuide onGoTo={setActiveTab} />
+          </div>
+        )}
         {activeTab === 'business' && (
           <BusinessManager
             campaign={activeCampaign}
             onUpdateCampaign={handleUpdateCampaign}
             onAddNewCampaign={handleAddNewCampaign}
+            onDeleteCampaign={handleDeleteCampaign}
           />
         )}
 
-        {activeTab === 'seo-research' && (
-          <SeoResearch
-            campaign={activeCampaign}
+        {activeTab === 'market-siege' && (
+          <MarketSiegePanel
+            campaigns={campaigns}
+            onReloadCampaigns={handleReloadCampaigns}
             onUpdateCampaign={handleUpdateCampaign}
-            onNavigateNext={() => setActiveTab('content-writer')}
           />
         )}
 
-        {activeTab === 'content-writer' && (
-          <ContentGenerator
+        {activeTab === 'visual-asset' && (
+          <VisualAssetStudio
             campaign={activeCampaign}
             onUpdateCampaign={handleUpdateCampaign}
-            onNavigateQC={() => setActiveTab('qc-audit')}
-          />
-        )}
-
-        {activeTab === 'qc-audit' && (
-          <QualityControlAudit
-            campaign={activeCampaign}
-            onUpdateCampaign={handleUpdateCampaign}
-            onNavigatePreview={() => setActiveTab('dongkrak-preview')}
           />
         )}
 
@@ -195,6 +284,7 @@ export default function App() {
             onUpdateCampaign={handleUpdateCampaign}
             onNavigateSettings={() => setActiveTab('connection-settings')}
             onNavigateHistory={() => setActiveTab('history')}
+            pendingAutopostCampaignRef={pendingAutopostCampaignRef}
           />
         )}
 

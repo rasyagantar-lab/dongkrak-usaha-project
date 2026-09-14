@@ -20,12 +20,14 @@ interface BusinessManagerProps {
   campaign: Campaign;
   onUpdateCampaign: (campaign: Campaign) => void;
   onAddNewCampaign: () => void;
+  onDeleteCampaign?: (campaign: Campaign) => Promise<void> | void;
 }
 
 export const BusinessManager: React.FC<BusinessManagerProps> = ({
   campaign,
   onUpdateCampaign,
-  onAddNewCampaign
+  onAddNewCampaign,
+  onDeleteCampaign
 }) => {
   const [formData, setFormData] = useState<BusinessData>({ ...campaign.businessData });
   const [newProduct, setNewProduct] = useState('');
@@ -155,6 +157,19 @@ export const BusinessManager: React.FC<BusinessManagerProps> = ({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {onDeleteCampaign && (
+            <button
+              onClick={() => onDeleteCampaign(campaign)}
+              disabled={campaign.status !== 'Draft'}
+              title={campaign.status === 'Draft'
+                ? 'Hapus campaign ini'
+                : `Hanya campaign berstatus Draft yang bisa dihapus (ini ${campaign.status}) -- sudah ada listing/riwayat di baliknya`}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-rose-50 text-rose-700 border border-rose-200 text-xs font-medium rounded-lg hover:bg-rose-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+              Hapus
+            </button>
+          )}
           <button
             onClick={onAddNewCampaign}
             className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-200 transition-colors"

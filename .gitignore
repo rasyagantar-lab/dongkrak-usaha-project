@@ -6,3 +6,9 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Runtime state: real campaign + publish-history data, and uploaded/generated
+# listing artwork. Local working data, not source.
+data/
+public/base-photos/
+public/generated-images/

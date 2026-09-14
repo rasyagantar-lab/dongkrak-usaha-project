@@ -9,7 +9,7 @@ export const INITIAL_CAMPAIGNS: Campaign[] = [
     businessData: {
       id: 'biz-001',
       name: 'Jasa Rakit Furniture Panggilan Professional',
-      category: 'Jasa & Pertukangan Mebel',
+      category: 'Jasa Furniture',
       description: 'Penyedia jasa rakit furniture knockdown (IKEA, Informa, Olympic, Dekoruma, Modena, dll) dan perbaikan mebel panggilan berpengalaman di [Nama Daerah Target]. Melayani perakitan lemari pakaian, tempat tidur, meja kerja, kitchen set, dan kabinet kantor dengan garansi rapi, presisi, dan kokoh.',
       productsServices: [
         'Jasa Rakit Lemari Pakaian Knockdown & Wardrobe Slidings',
@@ -69,7 +69,7 @@ export const INITIAL_CAMPAIGNS: Campaign[] = [
         'Layanan Panggilan Cepat Fleksibel Setiap Hari'
       ],
       callToAction: 'Hubungi WhatsApp 085179736469 sekarang untuk konsultasi & penawaran jasa rakit furniture terbaik!',
-      mappedCategory: 'Jasa & Pertukangan Mebel',
+      mappedCategory: 'Jasa Furniture',
       tags: ['Rakit Furniture', 'Mebel Knockdown', 'Pertukangan', '085179736469']
     },
     validationScore: {
@@ -86,7 +86,7 @@ export const INITIAL_CAMPAIGNS: Campaign[] = [
     },
     dongkrakListingData: {
       namaProduk: 'Jasa Rakit Furniture Di [Nama Daerah] - Panggilan Bergaransi WA 085179736469',
-      kategori: 'Jasa & Pertukangan Mebel',
+      kategori: 'Furniture',
       penawaran: 'Jasa rakit & bongkar pasang furniture knockdown (IKEA, Informa, Olympic) cepat, rapi & bergaransi di [Nama Daerah]. Hubungi WA 085179736469.',
       deskripsi: 'Apakah Anda baru saja membeli furniture knockdown merk IKEA, Informa, Olympic, atau Dekoruma tetapi bingung merakitnya? Jasa Rakit Furniture Panggilan Professional siap hadir ke lokasi Anda di wilayah [Nama Daerah Target] dan sekitarnya. Hubungi WhatsApp 085179736469!',
       harga: '100000',

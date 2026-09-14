@@ -1,17 +1,17 @@
 import React from 'react';
 import { 
   Building2, 
-  Search, 
-  Sparkles, 
-  ShieldCheck, 
   Eye, 
   Send, 
   Settings, 
   History, 
-  Globe, 
-  CheckCircle2, 
-  AlertTriangle, 
-  XCircle 
+  Globe,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  Workflow,
+  Image as ImageIcon,
+  MapPinned
 } from 'lucide-react';
 import { Campaign, DongkrakUsahaConnectionConfig } from '../types';
 
@@ -33,6 +33,15 @@ export const Header: React.FC<HeaderProps> = ({
   connectionConfig
 }) => {
   const activeCampaign = campaigns.find(c => c.id === activeCampaignId);
+
+  // Parents first, then each market-siege batch as its own <optgroup>. Clones are
+  // labelled by AREA, not business name -- 30 clones of one business all share the
+  // same name and were indistinguishable in this dropdown before.
+  const parentCampaigns = campaigns.filter(c => !c.siegeBatchId);
+  const siegeBatches: Record<string, Campaign[]> = {};
+  for (const c of campaigns) {
+    if (c.siegeBatchId) (siegeBatches[c.siegeBatchId] ||= []).push(c);
+  }
 
   const getStatusBadge = () => {
     if (connectionConfig.status === 'Connected') {
@@ -59,15 +68,18 @@ export const Header: React.FC<HeaderProps> = ({
     );
   };
 
+  // Ordered as the actual work order, and numbered, so a first-time operator can
+  // read the flow left-to-right: data in -> (optionally) multiply per area -> let the
+  // AI do everything -> picture -> publish. Connection and Riwayat are utilities.
   const navItems = [
-    { id: 'business', label: 'Profil Bisnis', icon: Building2 },
-    { id: 'seo-research', label: 'SEO & Keyword', icon: Search },
-    { id: 'content-writer', label: 'AI Content', icon: Sparkles },
-    { id: 'qc-audit', label: 'AI QC Audit', icon: ShieldCheck },
-    { id: 'dongkrak-preview', label: 'DongkrakUsaha Preview', icon: Eye },
-    { id: 'publishing-hub', label: 'Publish Distribution', icon: Send },
-    { id: 'connection-settings', label: 'Connection', icon: Settings },
-    { id: 'history', label: 'Riwayat Publish', icon: History }
+    { id: 'business', label: '1. Data Bisnis', icon: Building2 },
+    { id: 'market-siege', label: '2. Kepung Pasar', icon: MapPinned },
+    { id: 'orchestrator', label: '3. AI Orchestrator', icon: Workflow },
+    { id: 'visual-asset', label: '4. Visual Aset', icon: ImageIcon },
+    { id: 'dongkrak-preview', label: '5. Preview', icon: Eye },
+    { id: 'publishing-hub', label: '6. Publish', icon: Send },
+    { id: 'connection-settings', label: 'Koneksi', icon: Settings },
+    { id: 'history', label: 'Riwayat', icon: History }
   ];
 
   return (
@@ -94,18 +106,29 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Campaign Selector & Connection Status */}
-        <div className="flex items-center flex-wrap gap-2.5">
-          <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-lg border border-slate-200">
-            <span className="text-xs text-slate-500 font-medium pl-1 hidden sm:inline">Campaign:</span>
+        <div className="flex items-center flex-wrap gap-2.5 min-w-0">
+          {/* min-w-0 + max-w-full let the select shrink instead of pushing the page
+              wider than the viewport when a campaign name is long (phone widths). */}
+          <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-lg border border-slate-200 min-w-0 max-w-full">
+            <span className="text-xs text-slate-500 font-medium pl-1 hidden sm:inline shrink-0">Campaign:</span>
             <select
               value={activeCampaignId}
               onChange={(e) => setActiveCampaignId(e.target.value)}
-              className="bg-white text-xs text-slate-800 font-semibold border border-slate-200 rounded-md px-2.5 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="bg-white text-xs text-slate-800 font-semibold border border-slate-200 rounded-md px-2.5 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0 max-w-[70vw] sm:max-w-xs truncate"
             >
-              {campaigns.map((cmp) => (
+              {parentCampaigns.map((cmp) => (
                 <option key={cmp.id} value={cmp.id}>
                   {cmp.businessData.name} ({cmp.status})
                 </option>
+              ))}
+              {Object.entries(siegeBatches).map(([batchId, items]) => (
+                <optgroup key={batchId} label={`Kepung Pasar · ${items[0].businessData.name} (${items.length} area)`}>
+                  {items.map((cmp) => (
+                    <option key={cmp.id} value={cmp.id}>
+                      {cmp.siegeTargetArea} ({cmp.status})
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>

@@ -1,1 +1,42 @@
 @import "tailwindcss";
+
+/*
+  Animation policy for this app (see CLAUDE.md, "UI conventions").
+  Target hardware is <=8GB-RAM laptops with integrated GPUs, so every animation here
+  touches ONLY transform and opacity -- the two properties the compositor can animate
+  without layout or paint. No blur, no box-shadow, no width/height transitions.
+  Everything is also gated by prefers-reduced-motion via Tailwind's motion-reduce:
+  variant at the call site.
+*/
+
+@keyframes du-fade-scale-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes du-fade-scale-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(8px) scale(0.97); }
+}
+
+@keyframes du-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes du-fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* Slight upward settle for a freshly switched tab panel. */
+@keyframes du-panel-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@utility animate-du-scale-in { animation: du-fade-scale-in 280ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+@utility animate-du-scale-out { animation: du-fade-scale-out 200ms ease-in both; }
+@utility animate-du-fade-in { animation: du-fade-in 220ms ease-out both; }
+@utility animate-du-fade-out { animation: du-fade-out 200ms ease-in both; }
+@utility animate-du-panel-in { animation: du-panel-in 180ms ease-out both; }

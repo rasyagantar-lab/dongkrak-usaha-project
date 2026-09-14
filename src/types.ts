@@ -1,9 +1,10 @@
-export type CampaignStatus = 
-  | 'Draft' 
-  | 'SEO Ready' 
-  | 'Ready to Publish' 
-  | 'Publishing' 
-  | 'Published' 
+export type CampaignStatus =
+  | 'Draft'
+  | 'SEO Ready'
+  | 'Ready to Publish'
+  | 'Publishing'
+  | 'Submitted'
+  | 'Published'
   | 'Publishing Failed';
 
 export interface BusinessData {
@@ -101,6 +102,14 @@ export interface PublishRecord {
   accountUsed?: string;
 }
 
+export interface ImageBrief {
+  conceptTitle: string;
+  visualPrompt: string;
+  negativePrompt?: string;
+  style?: string;
+  caption: { title: string; subtitle: string; badge: string };
+}
+
 export interface Campaign {
   id: string;
   title: string;
@@ -108,11 +117,21 @@ export interface Campaign {
   seoStrategy: SEOStrategy;
   generatedContent: GeneratedContent;
   validationScore?: SEOValidationScore;
+  // Written by the orchestrator's image-brief stage so the Visual Aset tab can use the
+  // caption + visual prompt directly instead of re-running the agent.
+  imageBrief?: ImageBrief;
   dongkrakListingData?: DongkrakUsahaListingData;
   status: CampaignStatus;
   externalListingId?: string;
   publishedUrl?: string;
   updatedAt: string;
+  // Market-siege ("kepung pasar") lineage. A siege clone is derived from one parent
+  // campaign and laser-targeted at exactly one sub-area (kecamatan). All clones from
+  // the same drafting run share a siegeBatchId so they can be listed and realised
+  // together; the parent itself carries neither field.
+  siegeBatchId?: string;
+  siegeTargetArea?: string;
+  siegeParentId?: string;
 }
 
 export interface BulkQueueItem {

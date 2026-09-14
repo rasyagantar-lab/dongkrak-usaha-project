@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  History, 
-  ExternalLink, 
-  CheckCircle2, 
-  XCircle, 
-  RefreshCw, 
-  Search, 
-  Globe 
+import {
+  History,
+  ExternalLink,
+  CheckCircle2,
+  XCircle,
+  RefreshCw,
+  Search,
+  Globe,
+  Clock,
+  Send
 } from 'lucide-react';
 import { PublishRecord } from '../types';
 
@@ -14,6 +16,9 @@ export const PublishingHistory: React.FC = () => {
   const [historyRecords, setHistoryRecords] = useState<PublishRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchFilter, setSearchFilter] = useState('');
+  const [urlDrafts, setUrlDrafts] = useState<Record<string, string>>({});
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [saveErrors, setSaveErrors] = useState<Record<string, string>>({});
 
   const fetchHistory = async () => {
     setIsLoading(true);
@@ -33,6 +38,35 @@ export const PublishingHistory: React.FC = () => {
   useEffect(() => {
     fetchHistory();
   }, []);
+
+  const handleSaveUrl = async (record: PublishRecord) => {
+    const url = (urlDrafts[record.id] || '').trim();
+    if (!url.startsWith('http')) {
+      setSaveErrors(prev => ({ ...prev, [record.id]: 'URL harus diawali dengan http:// atau https://' }));
+      return;
+    }
+
+    setSavingId(record.id);
+    setSaveErrors(prev => ({ ...prev, [record.id]: '' }));
+
+    try {
+      const response = await fetch('/api/dongkrakusaha/mark-published', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaignId: record.campaignId, publishedUrl: url, historyRecordId: record.id })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.errorMessage || 'Gagal menyimpan URL publish.');
+      }
+      setUrlDrafts(prev => ({ ...prev, [record.id]: '' }));
+      await fetchHistory();
+    } catch (err: any) {
+      setSaveErrors(prev => ({ ...prev, [record.id]: err.message || 'Gagal menyimpan URL publish.' }));
+    } finally {
+      setSavingId(null);
+    }
+  };
 
   const filteredRecords = historyRecords.filter(r => 
     r.businessName.toLowerCase().includes(searchFilter.toLowerCase()) ||
@@ -105,6 +139,7 @@ export const PublishingHistory: React.FC = () => {
               <tbody className="divide-y divide-slate-100">
                 {filteredRecords.map((record) => {
                   const isSuccess = record.status === 'Published';
+                  const isPending = record.status === 'Submitted';
                   return (
                     <tr key={record.id} className="hover:bg-slate-50/50">
                       <td className="p-3.5">
@@ -128,6 +163,11 @@ export const PublishingHistory: React.FC = () => {
                             <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                             Published
                           </span>
+                        ) : isPending ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-3xs font-bold bg-amber-100 text-amber-800">
+                            <Clock className="w-3 h-3 text-amber-600" />
+                            Submitted
+                          </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-3xs font-bold bg-rose-100 text-rose-800">
                             <XCircle className="w-3 h-3 text-rose-600" />
@@ -149,6 +189,32 @@ export const PublishingHistory: React.FC = () => {
                             <span>Lihat Listing</span>
                             <ExternalLink className="w-3.5 h-3.5" />
                           </a>
+                        ) : isPending ? (
+                          <div className="space-y-1.5 min-w-[220px]">
+                            <p className="text-3xs text-amber-700 font-medium">
+                              URL publik baru tersedia ~24 jam setelah submit. Isi di sini begitu sudah ada:
+                            </p>
+                            <div className="flex gap-1.5">
+                              <input
+                                type="url"
+                                value={urlDrafts[record.id] || ''}
+                                onChange={(e) => setUrlDrafts(prev => ({ ...prev, [record.id]: e.target.value }))}
+                                placeholder="https://dongkrakusaha.com/iklan/..."
+                                className="flex-1 text-3xs border border-slate-300 rounded p-1.5 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                              />
+                              <button
+                                onClick={() => handleSaveUrl(record)}
+                                disabled={savingId === record.id || !(urlDrafts[record.id] || '').trim()}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-3xs font-bold rounded disabled:opacity-50 cursor-pointer shrink-0"
+                              >
+                                {savingId === record.id ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                                Simpan
+                              </button>
+                            </div>
+                            {saveErrors[record.id] && (
+                              <p className="text-3xs text-rose-600 font-medium">{saveErrors[record.id]}</p>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-3xs text-rose-600 font-medium line-clamp-2">
                             {record.errorMessage || 'No error details recorded.'}

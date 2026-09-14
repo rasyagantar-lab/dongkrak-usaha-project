@@ -505,6 +505,32 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request.action === 'AUTOFILL_CAMPAIGN' || request.action === 'SUBMIT_CAMPAIGN') {
+    chrome.tabs.query({}, (tabs) => {
+      const dongkrakTabs = (tabs || []).filter((tab) => {
+        const url = `${tab.url || ''} ${tab.pendingUrl || ''}`.toLowerCase();
+        return url.includes('dongkrakusaha.com');
+      });
+      const tab = dongkrakTabs.find((item) => `${item.url || item.pendingUrl || ''}`.toLowerCase().includes('menu=produk')) ||
+        dongkrakTabs.find((item) => item.active) ||
+        dongkrakTabs[0];
+
+      if (!tab?.id) {
+        sendResponse({ success: false, error: 'NO_DONGKRAK_TAB' });
+        return;
+      }
+
+      chrome.tabs.sendMessage(tab.id, request, { frameId: 0 }, (response) => {
+        if (chrome.runtime.lastError) {
+          sendResponse({ success: false, error: chrome.runtime.lastError.message });
+          return;
+        }
+        sendResponse(response || { success: false, error: 'EMPTY_CONTENT_RESPONSE' });
+      });
+    });
+    return true;
+  }
+
   if (request.action === 'NOTIFY_DOM_CHANGED') {
     if (request.payload) {
       console.log("[DONGKRAK EXT BG] NOTIFY_DOM_CHANGED Received:", {

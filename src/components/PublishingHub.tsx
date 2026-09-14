@@ -35,6 +35,9 @@ interface PublishingHubProps {
   onUpdateCampaign: (campaign: Campaign) => void;
   onNavigateSettings: () => void;
   onNavigateHistory: () => void;
+  // Owned by App (never unmounts) so the autopost submit-result handler survives the
+  // user switching tabs away from Publishing Hub right after clicking Submit.
+  pendingAutopostCampaignRef: React.MutableRefObject<string | null>;
 }
 
 export interface AuthoritativeFormMeta {
@@ -127,7 +130,8 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
   connectionConfig,
   onUpdateCampaign,
   onNavigateSettings,
-  onNavigateHistory
+  onNavigateHistory,
+  pendingAutopostCampaignRef
 }) => {
   const [connectionStatus, setConnectionStatus] = useState<DetailedConnectionStatus>({
     extensionRuntime: 'UNKNOWN',
@@ -160,10 +164,10 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
   const [isTesting, setIsTesting] = useState(false);
   const [showExtensionGuide, setShowExtensionGuide] = useState(false);
 
-  const [publishResultMsg, setPublishResultMsg] = useState<string | null>(null);
-  const [publishErrorMsg, setPublishErrorMsg] = useState<string | null>(null);
-  const [manualPublishUrl, setManualPublishUrl] = useState('');
-  const [isPublishing, setIsPublishing] = useState(false);
+  const [autopostStatus, setAutopostStatus] = useState<string | null>(null);
+  const [autopostResult, setAutopostResult] = useState<any>(null);
+  const autopostRequestRef = useRef<string | null>(null);
+  const autopostTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isConnected = connectionConfig.status === 'Connected';
   const hasListingData = !!activeCampaign.dongkrakListingData;
@@ -206,7 +210,6 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
     requestStartTimesRef.current.set(requestId, t0);
 
     setIsTesting(true);
-    setPublishErrorMsg(null);
 
     setConnectionStatus(prev => ({
       ...prev,
@@ -453,6 +456,36 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
     window.open('https://dongkrakusaha.com/panelMember/index.php?menu=produk', '_blank');
   };
 
+  const handleAutofillCampaign = () => {
+    const requestId = `autofill-${Date.now()}`;
+    if (autopostTimeoutRef.current) clearTimeout(autopostTimeoutRef.current);
+    autopostRequestRef.current = requestId;
+    setAutopostStatus('Mengirim data campaign ke form DongkrakUsaha...');
+    setAutopostResult(null);
+    window.postMessage({ type: 'DONGKRAK_AUTOFILL_CAMPAIGN', requestId, campaign: activeCampaign }, '*');
+    autopostTimeoutRef.current = setTimeout(() => {
+      if (autopostRequestRef.current !== requestId) return;
+      setAutopostResult({ success: false, error: 'AUTOFILL_TIMEOUT' });
+      setAutopostStatus('Autopost timeout setelah 10 detik. Reload extension dan pastikan tab DongkrakUsaha terbuka.');
+    }, 10000);
+  };
+
+  const handleSubmitCampaign = () => {
+    if (!autopostResult?.success || autopostResult?.captchaDetected || autopostResult?.imageReady === false) return;
+    if (!window.confirm('Field sudah terisi. Submit listing ini ke DongkrakUsaha sekarang?')) return;
+    const requestId = `submit-${Date.now()}`;
+    if (autopostTimeoutRef.current) clearTimeout(autopostTimeoutRef.current);
+    autopostRequestRef.current = requestId;
+    pendingAutopostCampaignRef.current = activeCampaign.id;
+    setAutopostStatus('Mengirim submit ke DongkrakUsaha...');
+    window.postMessage({ type: 'DONGKRAK_SUBMIT_CAMPAIGN', requestId, campaign: activeCampaign }, '*');
+    autopostTimeoutRef.current = setTimeout(() => {
+      if (autopostRequestRef.current !== requestId) return;
+      setAutopostResult({ success: false, error: 'SUBMIT_TIMEOUT' });
+      setAutopostStatus('Submit timeout setelah 10 detik. Periksa tab DongkrakUsaha dan reload extension.');
+    }, 10000);
+  };
+
   const updateExtStateFromPayload = (payload: any, requestId?: string) => {
     console.warn('[FORENSIC-RAW-PAYLOAD]', JSON.stringify(payload, null, 2));
     console.warn('[TRACE-REACT-RECEIVE]', { reqId: requestId, seq: payload.stateSequence, tabDetected: payload.tabDetected, liveStatus: payload.liveInspectionStatus });
@@ -476,8 +509,9 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
 
     setExtState(prev => {
       let isTabFound = !!(dongkrakState.tabDetected ?? dongkrakState.dongkrakusahaDetected ?? payload.tabDetected);
-      
-      let rawAuthStatus = dongkrakState.authStatus || payload.authStatus;
+      const rawAuthStatus = dongkrakState.authStatus || payload.authStatus;
+      const isExplicitNoTab = !isTabFound || rawAuthStatus === 'NO_TAB' || payload.pageType === 'NO_TAB' || dongkrakState.pageType === 'NO_TAB' || (typeof dongkrakState.tabDetected === 'boolean' && !dongkrakState.tabDetected && !fieldsCount);
+
       let isAuth = isTabFound ? (rawAuthStatus === 'AUTHENTICATED' || prev.isLoggedIn) : false;
 
       if (rawAuthStatus === 'AUTHENTICATED') {
@@ -490,19 +524,22 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
         isAuth = dongkrakState.loggedIn;
       }
 
-      // Sticky Fields Preservation:
-      // If incoming payload has 0 fields but previous state or lastVerifiedState had valid fields, preserve them
-      let finalFields = fields && fields.length > 0 ? fields : (isTabFound ? (prev.fieldsDiscovered.length > 0 ? prev.fieldsDiscovered : []) : (prev.fieldsDiscovered.length > 0 ? prev.fieldsDiscovered : []));
-      if (!isTabFound && prev.fieldsDiscovered.length > 0 && dongkrakState.authStatus !== 'DISCONNECTED') {
-        // Soft fallback: keep tab as detected if we have active known valid state
-        isTabFound = true;
+      // IMPORTANT: when the extension says NO_TAB, do not keep stale fields from the last valid state.
+      // This was the source of the false "64 fields still visible" state even after DongkrakUsaha tab closed.
+      let finalFields = fields && fields.length > 0 ? fields : [];
+      if (!isExplicitNoTab && !isTabFound && prev.fieldsDiscovered.length > 0 && fieldsCount === 0) {
+        finalFields = prev.fieldsDiscovered;
+      }
+      if (isExplicitNoTab) {
+        finalFields = [];
+        isTabFound = false;
       }
 
       const finalFieldsCount = finalFields.length;
       const rawFormDetected = !!(dongkrakState.productInputDetected ?? dongkrakState.formDetected ?? payload.formDetected);
-      const finalFormDetected = isTabFound && finalFieldsCount > 0 && (rawFormDetected || finalFieldsCount >= 3 || prev.formDetected);
+      const finalFormDetected = !isExplicitNoTab && isTabFound && finalFieldsCount > 0 && (rawFormDetected || finalFieldsCount >= 3 || prev.formDetected);
 
-      let finalPageType = isTabFound ? (dongkrakState.pageType || payload.pageType || prev.pageType || 'PUBLIC_PAGE') : 'NO_TAB';
+      let finalPageType = isExplicitNoTab ? 'NO_TAB' : (isTabFound ? (dongkrakState.pageType || payload.pageType || prev.pageType || 'PUBLIC_PAGE') : 'NO_TAB');
       if (isTabFound && (isAuth || prev.isLoggedIn) && finalFieldsCount > 0) {
         finalPageType = 'PRODUCT_INPUT_FORM';
       }
@@ -539,7 +576,7 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
         errorMessage: isTabFound ? (dongkrakState.message || payload.errorMessage || null) : 'No open DongkrakUsaha tab detected.'
       };
 
-      if (finalFieldsCount > 0 || (isTabFound && isAuth)) {
+      if (!isExplicitNoTab && (finalFieldsCount > 0 || (isTabFound && isAuth))) {
         setTimeout(() => setLastVerifiedState(newState), 0);
       }
 
@@ -551,6 +588,18 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (!event.data) return;
+
+      if (event.data.type === 'DONGKRAK_AUTOFILL_RESULT' || event.data.type === 'DONGKRAK_SUBMIT_RESULT') {
+        if (event.data.requestId && event.data.requestId !== autopostRequestRef.current) return;
+        if (autopostTimeoutRef.current) clearTimeout(autopostTimeoutRef.current);
+        const result = event.data.payload || {};
+        setAutopostResult(result);
+        setAutopostStatus(result.success
+          ? (event.data.type === 'DONGKRAK_SUBMIT_RESULT'
+            ? 'Submit terkirim dan tercatat sebagai Submitted. DongkrakUsaha baru menyediakan URL publik ~24 jam kemudian — isi manual di kolom di bawah setelah itu tersedia.'
+            : `Autofill selesai: ${result.filledCount ?? result.filled?.length ?? 0} field diisi${result.missingCount || result.missing?.length ? `, ${result.missingCount ?? result.missing.length} belum ditemukan` : ''}${result.imageReady === false ? ' Foto belum berhasil dipasang.' : ''}.`)
+          : `Autopost berhenti: ${result.error || 'unknown error'}`);
+      }
 
       if (event.data.type === 'DONGKRAK_BRIDGE_CONTEXT_INVALIDATED') {
         const deadInstanceId = event.data.bridgeInstanceId;
@@ -772,42 +821,6 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
     };
   }, [requestExtensionState, addDiagnosticLog]);
 
-  const handleMarkPublishedManual = async () => {
-    if (!manualPublishUrl.startsWith('http')) {
-      setPublishErrorMsg("URL harus diawali dengan http:// atau https://");
-      return;
-    }
-
-    setIsPublishing(true);
-    setPublishResultMsg(null);
-    setPublishErrorMsg(null);
-
-    try {
-      const response = await fetch('/api/dongkrakusaha/mark-published', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          campaignId: activeCampaign.id,
-          publishedUrl: manualPublishUrl
-        })
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        setPublishResultMsg(`Berhasil menandai URL: ${data.publishResult.publishedUrl}`);
-        setManualPublishUrl('');
-        onUpdateCampaign(data.campaign);
-      } else {
-        setPublishErrorMsg(data.errorMessage || 'Gagal menyimpan status publishing.');
-      }
-    } catch (err: any) {
-      setPublishErrorMsg(`Gagal: ${err.message}`);
-    } finally {
-      setIsPublishing(false);
-    }
-  };
-
   const [isDownloadingZip, setIsDownloadingZip] = useState(false);
 
   const handleDownloadExtensionZip = async () => {
@@ -989,29 +1002,20 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
       </div>
 
       {/* Feedback Messages */}
-      {publishResultMsg && (
+      {activeCampaign.status === 'Published' && activeCampaign.publishedUrl && (
         <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-xs font-medium flex items-center justify-between">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>{publishResultMsg}</span>
+            <span>Campaign ini sudah Published.</span>
           </div>
-          {activeCampaign.publishedUrl && (
-            <a
-              href={activeCampaign.publishedUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 text-emerald-700 font-bold hover:underline shrink-0"
-            >
-              Buka Listing <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          )}
-        </div>
-      )}
-
-      {publishErrorMsg && (
-        <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg text-xs font-medium flex items-center gap-2">
-          <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
-          <span>{publishErrorMsg}</span>
+          <a
+            href={activeCampaign.publishedUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-emerald-700 font-bold hover:underline shrink-0"
+          >
+            Buka Listing <ExternalLink className="w-3.5 h-3.5" />
+          </a>
         </div>
       )}
 
@@ -1711,8 +1715,41 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
             
             <ol className="list-decimal pl-5 space-y-1.5 text-slate-700">
               <li>Pastikan Anda sudah login dan membuka halaman <strong>Input Produk</strong>.</li>
-              <li>Salin nilai dari form di bawah ini dan tempel ke form DongkrakUsaha.</li>
+              <li>Gunakan autopost untuk mengisi field dari campaign aktif, lalu tinjau hasilnya.</li>
             </ol>
+
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
+              <div className="flex items-start gap-2 text-amber-900 text-xs">
+                <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>Autopost berhenti sebelum submit. Submit hanya berjalan setelah konfirmasi dan akan diblokir jika CAPTCHA terdeteksi.</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={handleAutofillCampaign}
+                  disabled={!activeCampaign.dongkrakListingData || !extState.formDetected}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg disabled:opacity-50 cursor-pointer"
+                >
+                  <Zap className="w-3.5 h-3.5" /> Isi Form Otomatis
+                </button>
+                <button
+                  onClick={handleSubmitCampaign}
+                  disabled={!autopostResult?.success || autopostResult?.captchaDetected || autopostResult?.imageReady === false}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg disabled:opacity-50 cursor-pointer"
+                >
+                  <Send className="w-3.5 h-3.5" /> Konfirmasi & Submit
+                </button>
+              </div>
+              {autopostStatus && <p className="text-2xs font-semibold text-slate-700">{autopostStatus}</p>}
+              {autopostResult?.missing?.length > 0 && (
+                <p className="text-2xs text-amber-800">Field belum ditemukan: {autopostResult.missing.join(', ')}</p>
+              )}
+              {autopostResult?.captchaDetected && (
+                <p className="text-2xs font-bold text-red-700">CAPTCHA terdeteksi. Submit otomatis diblokir.</p>
+              )}
+              {autopostResult?.imageReady === false && (
+                <p className="text-2xs font-bold text-red-700">Foto wajib belum terpasang: {autopostResult.image?.error || 'unknown image error'}.</p>
+              )}
+            </div>
 
             <div className="bg-white p-4 rounded-lg border border-slate-200 space-y-4 mt-3">
               <h5 className="font-bold text-sm text-slate-800 border-b border-slate-100 pb-2">Form Data DongkrakUsaha</h5>
@@ -1781,37 +1818,13 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
               )}
             </div>
 
-            <ol className="list-decimal pl-5 space-y-1.5 text-slate-700 mt-4 pt-4 border-t border-slate-200">
-              <li value="3">Klik tombol <strong>Submit</strong> di form DongkrakUsaha.</li>
-              <li>Setelah berhasil dipublish, salin <strong>URL Iklan</strong> yang sudah jadi dan tempel di bawah ini untuk menyimpan status.</li>
-            </ol>
-
-            <div className="mt-4 pt-4 border-t border-slate-200">
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                URL Listing yang Berhasil Dipublish <span className="text-red-500">*</span>
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="url"
-                  value={manualPublishUrl}
-                  onChange={(e) => setManualPublishUrl(e.target.value)}
-                  placeholder="https://dongkrakusaha.com/iklan/..."
-                  className="flex-1 text-xs border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  required
-                />
-                <button
-                  onClick={handleMarkPublishedManual}
-                  disabled={isPublishing || !manualPublishUrl.trim()}
-                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-sm transition-colors disabled:opacity-50 cursor-pointer"
-                >
-                  {isPublishing ? (
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="w-4 h-4" />
-                  )}
-                  Tandai Selesai
-                </button>
-              </div>
+            <div className="mt-4 pt-4 border-t border-slate-200 p-3 bg-blue-50/60 border-blue-100 rounded-lg text-xs text-blue-900 flex items-start gap-2">
+              <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+              <span>
+                Setelah klik <strong>Konfirmasi & Submit</strong> di atas, campaign otomatis tercatat sebagai <strong>Submitted</strong> di{' '}
+                <button onClick={onNavigateHistory} className="font-bold underline hover:text-blue-700 cursor-pointer">Riwayat Publish</button>.
+                URL listing publik DongkrakUsaha baru tersedia ~24 jam kemudian — isi URL-nya langsung dari halaman Riwayat Publish begitu sudah ada.
+              </span>
             </div>
           </div>
         </div>
