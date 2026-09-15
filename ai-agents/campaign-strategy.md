@@ -54,3 +54,5 @@ This file is your live rulebook: the application reads it fresh and shows it to 
 - [2026-09-14] Menjelaskan estimasi harga mulai Rp 100.000 secara transparan terbukti efektif meningkatkan respons pesan WhatsApp pada kampanye jasa pertukangan panggilan lokal.
 - [2026-09-14] Menyoroti garansi kerapihan dan kemudahan booking via WhatsApp secara instan terbukti efektif mendorong keputusan transaksi pada calon klien area Andir.
 - [2026-09-14] Menonjolkan transparansi tarif awal mulai dari Rp 100.000 dan jaminan kerapihan untuk brand populer terbukti sangat efektif membangun trust pada layanan jasa panggilan lokal.
+- [2026-09-15] Menonjolkan garansi pengerjaan rapi dan kecepatan respons via WhatsApp sangat efektif untuk meningkatkan kepercayaan pada layanan jasa rakit furniture panggilan.
+- [2026-09-15] Menonjolkan transparansi harga awal dan garansi kerapihan untuk brand ternama sangat efektif membangun trust pada layanan jasa rakit furniture panggilan.

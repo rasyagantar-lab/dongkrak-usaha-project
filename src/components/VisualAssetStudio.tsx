@@ -10,6 +10,7 @@ import {
   Info
 } from 'lucide-react';
 import { Campaign } from '../types';
+import { useJobCenter, useJob } from '../jobs';
 
 interface VisualAssetStudioProps {
   campaign: Campaign;
@@ -60,7 +61,30 @@ export const VisualAssetStudio: React.FC<VisualAssetStudioProps> = ({ campaign, 
   // pre-filled from the Image Brief's visualPrompt when the caption is fetched.
   const [showAiPrompt, setShowAiPrompt] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
+
+  // Generation (3-15 s on Cloudflare) runs as an App-level job keyed by category, so
+  // it survives tab/campaign switches; the panel reacts to the job's outcome below.
+  const { startJob } = useJobCenter();
+  const genJobId = `image:base:${categorySlug}`;
+  const genJob = useJob<{ message: string }>(genJobId);
+  const isGenerating = genJob?.status === 'running';
+  const handledGenRef = useRef<number>(0);
+  useEffect(() => {
+    if (!genJob || genJob.status === 'running' || !genJob.finishedAt) return;
+    if (handledGenRef.current === genJob.finishedAt) return;
+    if (Date.now() - genJob.finishedAt > 60_000) return; // stale outcome from long ago
+    handledGenRef.current = genJob.finishedAt;
+    if (genJob.status === 'done') {
+      loadBasePhotos();
+      setResult(null);
+      setShowAiPrompt(false);
+      setErrorMsg('');
+      setInfoMsg(genJob.result?.message || 'Foto dasar dibuat.');
+    } else {
+      setErrorMsg(genJob.error || 'Generate gambar gagal.');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [genJob?.status, genJob?.finishedAt]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -188,26 +212,25 @@ export const VisualAssetStudio: React.FC<VisualAssetStudioProps> = ({ campaign, 
       setErrorMsg('Tulis deskripsi gambar yang lebih jelas (minimal 15 karakter), atau ambil dari AI di langkah 2 dulu.');
       return;
     }
-    setIsGenerating(true);
-    try {
-      const res = await fetch('/api/image/generate-base-photo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ category, prompt: aiPrompt.trim() })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Generate gambar gagal.');
-
-      await loadBasePhotos();
-      setResult(null);
-      setShowAiPrompt(false);
-      const providerLabel = data.provider === 'cloudflare' ? 'Cloudflare Workers AI' : data.provider === 'huggingface' ? 'Hugging Face' : data.provider;
-      setInfoMsg(`Foto dasar untuk "${category}" dibuat oleh ${providerLabel} (${data.width}x${data.height}, ${((data.durationMs || 0) / 1000).toFixed(1)} dtk).`);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Generate gambar gagal.');
-    } finally {
-      setIsGenerating(false);
-    }
+    const prompt = aiPrompt.trim();
+    startJob<{ message: string }>(
+      { id: genJobId, tab: 'visual-asset', campaignId: campaign.id, label: 'Foto dasar AI', subject: category },
+      async (update, signal) => {
+        update({ detail: 'Menggambar foto dasar...' });
+        const res = await fetch('/api/image/generate-base-photo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ category, prompt }),
+          signal
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Generate gambar gagal.');
+        const providerLabel = data.provider === 'cloudflare' ? 'Cloudflare Workers AI' : data.provider === 'huggingface' ? 'Hugging Face' : data.provider;
+        const message = `Foto dasar untuk "${category}" dibuat oleh ${providerLabel} (${data.width}x${data.height}, ${((data.durationMs || 0) / 1000).toFixed(1)} dtk).`;
+        update({ detail: message });
+        return { message };
+      }
+    );
   };
 
   const handleCompose = async () => {

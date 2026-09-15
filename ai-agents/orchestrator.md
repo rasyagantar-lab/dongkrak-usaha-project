@@ -82,6 +82,9 @@ The builder checks these files before changing the application. Runtime orchestr
 - Every round is recorded in the ledger as `content-revisi-N` / `audit-ulang-N`, and summarised in `revisionHistory` with score before/after and whether it was accepted.
 - Observed behaviour on the first live run: audit `WARNINGS` at 88, revision produced 85, revision correctly discarded, original retained.
 
+## Live Progress Is Visible To The Operator (2026-09-15)
+- Each stage now reports a label ("Riset keyword SEO", "Audit kualitas", "Revisi konten ke-1") and the ledger is exposed while the run is in flight (`GET /api/orchestrator/progress/:runId`). The operator sees stage-by-stage progress in the UI and a tray notification on other tabs -- a slow stage is no longer a silent spinner, it is a named stage with a running clock. Runs also keep going when the operator switches tabs or campaigns.
+
 ## Hand-off Before Revision (2026-09-15)
 - Audit findings are classified `fixableBy: "ai" | "human"` (see quality-audit.md). While ANY human-required finding exists -- wrong/placeholder area name, missing WhatsApp or address -- the orchestrator does NOT run revision rounds. It records a `handoff` ledger entry and returns `humanActionRequired[]` so the operator gets editable fields for exactly those data points.
 - Why: copy complaints are almost always downstream of the data problem; rewriting on top of a placeholder area name spent two rounds and four LLM calls changing nothing the owner would keep. Revisions now run only when everything left is a copy problem.
@@ -109,3 +112,5 @@ Do not invent unavailable models, hidden tools, or unsupported APIs. Use only do
 - [2026-09-14] Menggabungkan nama merek furniture populer seperti IKEA dan Informa dengan nama lokasi spesifik Andir secara konsisten meningkatkan relevansi pencarian niat lokal.
 - [2026-09-14] Menyoroti merek furniture populer seperti IKEA, Informa, dan Dekoruma bersama nama lokasi spesifik Antapani secara konsisten memperkuat relevansi pencarian niat lokal.
 - [2026-09-15] Menekankan garansi perakitan presisi serta penyebutan merek furniture populer (IKEA, Informa, Dekoruma) secara konsisten memperkuat daya tarik penawaran jasa panggilan di kota-kota besar.
+- [2026-09-15] Penyebutan merek furniture populer secara konsisten memperkuat relevansi pencarian lokal pada layanan perakitan.
+- [2026-09-15] Adanya placeholder seperti '[Nama Daerah Target]' pada input bisnis harus diidentifikasi sejak awal sebagai pemicu hand-off manusia sebelum pipeline audit dijalankan.

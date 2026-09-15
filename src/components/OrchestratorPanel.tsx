@@ -14,6 +14,7 @@ import {
   Save
 } from 'lucide-react';
 import { Campaign } from '../types';
+import { useJobCenter, useJob, pollOrchestratorProgress } from '../jobs';
 
 interface LedgerEntry {
   order: number;
@@ -97,39 +98,51 @@ const rowTone = (status: LedgerEntry['status']) =>
 
 export const OrchestratorPanel: React.FC<OrchestratorPanelProps> = ({ campaign, onUpdateCampaign }) => {
   const [objective, setObjective] = useState('Meningkatkan penjualan dan visibilitas lokal');
-  const [isRunning, setIsRunning] = useState(false);
-  const [run, setRun] = useState<OrchestratorRun | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [applied, setApplied] = useState(false);
+
+  // The run itself lives in the App-level Job Center, keyed by campaign, so it keeps
+  // going -- and its result stays readable -- when the user switches tabs or
+  // campaigns while the agents are working (see src/jobs.tsx).
+  const { startJob } = useJobCenter();
+  const jobId = `orchestrator:${campaign.id}`;
+  const job = useJob<OrchestratorRun>(jobId);
+  const isRunning = job?.status === 'running';
+  const run = job?.status === 'done' ? job.result || null : null;
+  const error = job?.status === 'error' ? job.error || null : null;
+  const liveLedger: LedgerEntry[] = isRunning && Array.isArray(job?.meta?.ledger) ? job!.meta.ledger : [];
 
   // Draft values for the "Perlu Input Anda" editors, keyed by field.
   const [humanEdits, setHumanEdits] = useState<Record<string, string>>({});
 
-  const handleRun = async (override?: Campaign) => {
+  const handleRun = (override?: Campaign) => {
     const target = override || campaign;
-    setIsRunning(true);
-    setError(null);
-    setRun(null);
     setApplied(false);
+    const runId = `run-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-    try {
-      const response = await fetch('/api/orchestrator/run', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          businessData: target.businessData,
-          objective,
-          campaign: target
-        })
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data?.error || 'Orchestrator gagal dijalankan');
-      setRun(data);
-    } catch (err: any) {
-      setError(err.message || 'Gagal menjalankan orchestrator');
-    } finally {
-      setIsRunning(false);
-    }
+    startJob<OrchestratorRun>(
+      { id: jobId, tab: 'orchestrator', campaignId: target.id, label: 'AI Orchestrator', subject: target.businessData.name },
+      async (update, signal) => {
+        const stopPolling = pollOrchestratorProgress(runId, update, signal);
+        try {
+          const response = await fetch('/api/orchestrator/run', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ businessData: target.businessData, objective, campaign: target, runId }),
+            signal
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data?.error || 'Orchestrator gagal dijalankan');
+          const s = data.summary || {};
+          update({
+            detail: `${data.pipelineStatus} · ${s.done ?? 0}/${s.total ?? 0} stage${data.humanActionRequired?.length ? ` · ${data.humanActionRequired.length} perlu input Anda` : ''}`,
+            meta: { ledger: data.ledger }
+          });
+          return data as OrchestratorRun;
+        } finally {
+          stopPolling();
+        }
+      }
+    );
   };
 
   const handleApply = () => {
@@ -234,6 +247,39 @@ export const OrchestratorPanel: React.FC<OrchestratorPanelProps> = ({ campaign, 
           </div>
         </div>
       </div>
+
+      {isRunning && (
+        <div className="bg-white rounded-xl border border-violet-200 shadow-xs p-4 space-y-2.5 animate-du-fade-in motion-reduce:animate-none">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
+              <RefreshCw className="w-3.5 h-3.5 text-violet-600 animate-spin" />
+              {job?.detail || 'Menyiapkan pipeline...'}
+            </div>
+            <span className="text-3xs text-slate-400">Boleh pindah tab — proses tetap jalan di latar belakang.</span>
+          </div>
+          <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-violet-500 origin-left transition-transform duration-500 ease-out motion-reduce:transition-none"
+              style={{ transform: `scaleX(${job?.progress ?? 0.05})` }}
+            />
+          </div>
+          {liveLedger.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {liveLedger.map(entry => (
+                <span key={entry.order} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-3xs font-semibold border ${
+                  entry.status === 'done' ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                    : entry.status === 'failed' ? 'bg-rose-50 border-rose-200 text-rose-700'
+                    : 'bg-slate-50 border-slate-200 text-slate-500'
+                }`}>
+                  {statusIcon(entry.status)}
+                  {entry.agent}
+                  <span className="text-slate-400 font-mono">{(entry.durationMs / 1000).toFixed(1)}s</span>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {error && (
         <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg text-xs font-medium flex items-center gap-2">

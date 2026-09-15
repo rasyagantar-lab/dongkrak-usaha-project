@@ -12,6 +12,9 @@ import {
   Trash2
 } from 'lucide-react';
 import { Campaign, BulkQueueItem } from '../types';
+import { useJobCenter, useJob, pollOrchestratorProgress } from '../jobs';
+
+const REALIZE_JOB_ID = 'siege:realize';
 
 interface MarketSiegePanelProps {
   campaigns: Campaign[];
@@ -53,8 +56,14 @@ export const MarketSiegePanel: React.FC<MarketSiegePanelProps> = ({ campaigns, o
   const [errorMsg, setErrorMsg] = useState('');
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [queue, setQueue] = useState<Record<string, BulkQueueItem>>({});
-  const [isRealizing, setIsRealizing] = useState(false);
+
+  // The realisation batch runs inside the App-level Job Center (src/jobs.tsx): the
+  // per-area queue is the job's live meta, so leaving this tab mid-batch neither
+  // stops the loop nor loses the badges.
+  const { startJob } = useJobCenter();
+  const realizeJob = useJob<{ ok: number; failed: number }>(REALIZE_JOB_ID);
+  const isRealizing = realizeJob?.status === 'running';
+  const queue: Record<string, BulkQueueItem> = realizeJob?.meta?.queue || {};
 
   const parent = parentOptions.find(c => c.id === parentId) || parentOptions[0];
   const parsedAreas = useMemo(() => parseAreaNames(areaText), [areaText]);
@@ -121,59 +130,86 @@ export const MarketSiegePanel: React.FC<MarketSiegePanelProps> = ({ campaigns, o
   // Realisation runs STRICTLY one campaign at a time. Every agent draws on a shared
   // per-key Gemini allowance; firing several orchestrator runs in parallel would just
   // race each other into 429s. One failure records itself and the loop continues.
-  const handleRealize = async () => {
+  const handleRealize = () => {
     setErrorMsg('');
     const targets = campaigns.filter(c => selected.has(c.id) && c.status === 'Draft');
     if (targets.length === 0) {
       setErrorMsg('Belum ada draft yang dicentang.');
       return;
     }
-    setIsRealizing(true);
-    const initial: Record<string, BulkQueueItem> = {};
-    for (const c of targets) {
-      initial[c.id] = { campaignId: c.id, campaignTitle: c.title, businessName: c.businessData.name, status: 'pending' };
-    }
-    setQueue(initial);
+    const n = targets.length;
 
-    for (const c of targets) {
-      setQueue(q => ({ ...q, [c.id]: { ...q[c.id], status: 'processing' } }));
-      try {
-        const res = await fetch('/api/orchestrator/run', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ businessData: c.businessData, objective, campaign: c })
-        });
-        const run = await res.json();
-        if (!res.ok || !run?.ok) throw new Error(run?.error || `Pipeline ${run?.pipelineStatus || 'gagal'}`);
+    startJob<{ ok: number; failed: number }>(
+      {
+        id: REALIZE_JOB_ID,
+        tab: 'market-siege',
+        label: 'Realisasi Kepung Pasar',
+        subject: `${n} area · ${targets[0].businessData.name}`
+      },
+      async (update, signal) => {
+        let queue: Record<string, BulkQueueItem> = {};
+        for (const c of targets) {
+          queue[c.id] = { campaignId: c.id, campaignTitle: c.title, businessName: c.businessData.name, status: 'pending' };
+        }
+        const setQ = (id: string, changes: Partial<BulkQueueItem>) => {
+          queue = { ...queue, [id]: { ...queue[id], ...changes } };
+          update({ meta: { queue } });
+        };
+        update({ meta: { queue }, progress: 0, detail: `Mulai · 0/${n}` });
 
-        // Same apply logic as OrchestratorPanel.handleApply, so a realised clone ends up
-        // in exactly the state a manually orchestrated campaign would.
-        const { seoStrategy, generatedContent, audit, imageBrief } = run.outputs || {};
-        await onUpdateCampaign({
-          ...c,
-          seoStrategy: seoStrategy || c.seoStrategy,
-          generatedContent: generatedContent || c.generatedContent,
-          validationScore: audit || c.validationScore,
-          imageBrief: imageBrief || c.imageBrief,
-          status: audit?.publishingReadiness === 'READY' ? 'Ready to Publish' : 'SEO Ready',
-          updatedAt: new Date().toISOString()
-        });
-        setQueue(q => ({
-          ...q,
-          [c.id]: {
-            ...q[c.id],
-            status: 'success',
-            errorMessage: audit ? `Audit ${audit.publishingReadiness} · SEO ${audit.seoScore}` : undefined
+        let ok = 0;
+        let failed = 0;
+        for (let i = 0; i < n; i++) {
+          const c = targets[i];
+          const area = c.siegeTargetArea || c.title;
+          setQ(c.id, { status: 'processing' });
+          update({ progress: i / n, detail: `${area} (${i + 1}/${n})` });
+          const runId = `run-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+          const stopPolling = pollOrchestratorProgress(runId, (u) => update({
+            progress: (i + (u.progress ?? 0)) / n,
+            detail: `${area} (${i + 1}/${n}) · ${u.detail || ''}`
+          }), signal);
+          try {
+            const res = await fetch('/api/orchestrator/run', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ businessData: c.businessData, objective, campaign: c, runId }),
+              signal
+            });
+            const run = await res.json();
+            if (!res.ok || !run?.ok) throw new Error(run?.error || `Pipeline ${run?.pipelineStatus || 'gagal'}`);
+
+            // Same apply logic as OrchestratorPanel.handleApply, so a realised clone ends up
+            // in exactly the state a manually orchestrated campaign would.
+            const { seoStrategy, generatedContent, audit, imageBrief } = run.outputs || {};
+            await onUpdateCampaign({
+              ...c,
+              seoStrategy: seoStrategy || c.seoStrategy,
+              generatedContent: generatedContent || c.generatedContent,
+              validationScore: audit || c.validationScore,
+              imageBrief: imageBrief || c.imageBrief,
+              status: audit?.publishingReadiness === 'READY' ? 'Ready to Publish' : 'SEO Ready',
+              updatedAt: new Date().toISOString()
+            });
+            ok++;
+            setQ(c.id, {
+              status: 'success',
+              errorMessage: audit ? `Audit ${audit.publishingReadiness} · SEO ${audit.seoScore}` : undefined
+            });
+          } catch (err: any) {
+            if (signal.aborted) throw err;
+            failed++;
+            setQ(c.id, { status: 'failed', errorMessage: err.message || 'Gagal' });
+          } finally {
+            stopPolling();
           }
-        }));
-      } catch (err: any) {
-        setQueue(q => ({ ...q, [c.id]: { ...q[c.id], status: 'failed', errorMessage: err.message || 'Gagal' } }));
-      }
-    }
+        }
 
-    setSelected(new Set());
-    setIsRealizing(false);
-    await onReloadCampaigns();
+        await onReloadCampaigns();
+        update({ progress: 1, detail: `${ok} selesai${failed ? `, ${failed} gagal` : ''} dari ${n} area` });
+        return { ok, failed };
+      }
+    ).then(() => setSelected(new Set()));
   };
 
   const [deletingId, setDeletingId] = useState<string | null>(null);

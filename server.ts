@@ -2246,6 +2246,30 @@ interface LedgerEntry {
   durationMs: number;
 }
 
+// ---- Live orchestrator progress ----
+// A run takes 30-150 s and the HTTP response only arrives at the end. The client
+// polls this snapshot (keyed by the runId it sent) to show "tahap 3/6 · Audit" in
+// its job tray while the user is on another tab. Entries expire 2 min after finish.
+interface OrchestratorProgress {
+  runId: string;
+  campaignId?: string;
+  label: string;
+  completed: number;
+  total: number;
+  ledger: LedgerEntry[];
+  startedAt: number;
+  updatedAt: number;
+  finished: boolean;
+}
+const ORCH_PROGRESS = new Map<string, OrchestratorProgress>();
+const ORCH_PROGRESS_TTL_MS = 2 * 60 * 1000;
+
+app.get("/api/orchestrator/progress/:runId", (req, res) => {
+  const p = ORCH_PROGRESS.get(String(req.params.runId));
+  if (!p) return res.status(404).json({ error: "Run tidak ditemukan atau sudah kedaluwarsa." });
+  res.json(p);
+});
+
 const ORCHESTRATOR_PLAN_SCHEMA = {
   type: Type.OBJECT,
   properties: {
@@ -2300,12 +2324,28 @@ app.post("/api/orchestrator/run", async (req, res) => {
   const {
     businessData,
     objective = "Meningkatkan penjualan dan visibilitas lokal",
-    campaign
+    campaign,
+    runId: requestedRunId
   } = req.body || {};
 
   if (!businessData) {
     return res.status(400).json({ error: "businessData is required to run the orchestrator pipeline." });
   }
+
+  const runId = String(requestedRunId || `run-${startedAt}-${Math.random().toString(36).slice(2, 8)}`);
+  const progress: OrchestratorProgress = {
+    runId,
+    campaignId: campaign?.id,
+    label: "Menyiapkan pipeline",
+    completed: 0,
+    total: 6,
+    ledger,
+    startedAt,
+    updatedAt: startedAt,
+    finished: false
+  };
+  ORCH_PROGRESS.set(runId, progress);
+  const stage = (label: string) => { progress.label = label; progress.updatedAt = Date.now(); };
 
   let order = 0;
 
@@ -2319,6 +2359,10 @@ app.post("/api/orchestrator/run", async (req, res) => {
       durationMs: Date.now() - startMs,
       ...extra
     });
+    // Hand-off is an extra, unplanned entry; keep the fraction honest.
+    if (stage === 'handoff') progress.total += 1;
+    progress.completed = ledger.length;
+    progress.updatedAt = Date.now();
   };
 
   // Turns a thrown provider/config error into a short, user-actionable reason.
@@ -2328,6 +2372,7 @@ app.post("/api/orchestrator/run", async (req, res) => {
   // downstream; strategy is the first real dependency. They use different keys, so
   // running them together costs no extra quota on either and saves the briefing's
   // full latency (~8 s measured) from every run.
+  stage("Briefing & strategi kampanye");
   {
     const t0 = Date.now();
     const [planRes, strategyRes] = await Promise.allSettled([
@@ -2357,6 +2402,7 @@ app.post("/api/orchestrator/run", async (req, res) => {
   }
 
   // Stage 2: keyword strategy (uses strategy when available, still runs without it)
+  stage("Riset keyword SEO");
   {
     const t0 = Date.now();
     try {
@@ -2372,6 +2418,7 @@ app.post("/api/orchestrator/run", async (req, res) => {
   }
 
   // Stage 3: content (hard dependency on keyword output)
+  stage("Menulis konten listing");
   if (!outputs.seoStrategy) {
     record('content', 'Content Generation', 'content', 'skipped', Date.now(), {
       reason: 'Keyword stage did not produce an SEO strategy, so content has no keyword basis to write against.'
@@ -2391,6 +2438,7 @@ app.post("/api/orchestrator/run", async (req, res) => {
   }
 
   // Stage 4: audit (hard dependency on content)
+  stage("Audit kualitas");
   if (!outputs.generatedContent) {
     record('audit', 'Quality Control Audit', 'audit', 'skipped', Date.now(), {
       reason: 'No generated content to audit.'
@@ -2463,6 +2511,8 @@ app.post("/api/orchestrator/run", async (req, res) => {
     revisionRound++;
     const auditBefore = outputs.audit;
     const scoreBefore = Number(auditBefore.seoScore) || 0;
+    progress.total += 2;
+    stage(`Revisi konten ke-${revisionRound}`);
 
     const tRewrite = Date.now();
     let rewritten: any = null;
@@ -2485,6 +2535,7 @@ app.post("/api/orchestrator/run", async (req, res) => {
     }
 
     const tReaudit = Date.now();
+    stage(`Audit ulang ke-${revisionRound}`);
     try {
       const { result: reaudit, meta } = await runAuditAgent({
         businessData,
@@ -2529,6 +2580,7 @@ app.post("/api/orchestrator/run", async (req, res) => {
   }
 
   // Stage 5: image brief (needs content; audit is optional context)
+  stage("Brief visual & caption");
   if (!outputs.generatedContent) {
     record('image', 'Image Brief', 'image', 'skipped', Date.now(), {
       reason: 'No generated content to base a visual concept on.'
@@ -2576,8 +2628,14 @@ app.post("/api/orchestrator/run", async (req, res) => {
     ? 'COMPLETE'
     : outputs.generatedContent ? 'PARTIAL' : 'FAILED';
 
+  progress.finished = true;
+  progress.label = "Selesai";
+  progress.updatedAt = Date.now();
+  setTimeout(() => ORCH_PROGRESS.delete(runId), ORCH_PROGRESS_TTL_MS).unref?.();
+
   res.json({
     ok: pipelineStatus !== 'FAILED',
+    runId,
     pipelineStatus,
     readyForPublishing: false,
     blockers,

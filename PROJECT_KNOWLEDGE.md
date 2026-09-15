@@ -536,6 +536,24 @@ Fix (server.ts, `server/fonts/`, Dockerfile):
 
 Verified: boot log clean (no `[Caption]` line); `POST /api/image/compose` 1024x1024 PNG in 259 ms; the caption SVG for the test strings contains 3 `<path`, 0 `<text`, 0 `font-family`, and no character mapped to `.notdef`; the PNG was visually reviewed (title, subtitle, badge all crisp in Inter). Because no system font is consulted anywhere, the Linux output is the same bytes -- the only remaining check on the hosted copy is a redeploy.
 
+## Fix - Tabs Now Work In The Background; Job Tray Shows Per-Tab Progress (2026-09-15)
+Status: FIXED and VERIFIED (headless Chromium end-to-end, twice).
+
+User report: "every time I switch tabs, the previous tab loses its progress." Two real causes, both fixed:
+
+1. Panels unmounted on tab switch. `<main key={tab:campaign}>` remounted everything, so an orchestrator run's fetch kept going on the network but its result landed in a component that no longer existed. Now every tab stays mounted (`TabPanel`: `<section hidden>`), keyed only per campaign where a panel seeds state from the campaign prop (Orchestrator, Data Bisnis, Visual, Preview). Form inputs, results and the publishing hub's extension handshake all survive tab switches. The settle-in animation restarts when a section goes hidden -> shown, so tabs still feel like a transition.
+2. **Vite full-page reload on every agent call** (found during verification, not from the report). The agents append to `ai-agents/*.md` on each call; Vite's watcher saw a changed file and reloaded the page -- the dev log shows `[vite] (client) page reload ai-agents/campaign-strategy.md` etc. -- wiping ALL client state the moment a stage finished. Same for `data/*.json` writes and the extension zip rebuild. `vite.config.ts` now ignores `ai-agents/`, `data/`, generated images, `*.md`, `*.log`. Verified: 0 reload lines during a full run (was 4+). This only affects local dev (`npm run dev`); the built server has no Vite.
+
+Job Center (`src/jobs.tsx`): long work is started via `startJob(spec, runner)` and owned by an App-level provider, keyed by a stable id (`orchestrator:<campaignId>`, `siege:realize`, `image:base:<categorySlug>`). A panel that mounts later reads status/progress/result back from the store, so even a campaign switch mid-run loses nothing. Orchestrator, Kepung Pasar realisation, and AI base-photo generation use it.
+
+Live progress: the server keeps an `ORCH_PROGRESS` snapshot per run (`runId` sent by the client; `GET /api/orchestrator/progress/:runId` returns label, completed/total, ledger so far; expires 2 min after finish). The client polls every 2 s while the run is in flight. The orchestrator panel shows a progress bar + live ledger chips ("Boleh pindah tab -- proses tetap jalan di latar belakang"); the realisation batch shows "Ciputat (3/8) · Tahap 4/6 · Audit kualitas".
+
+Job tray (`src/components/JobTray.tsx`): bottom-left stack (above the model-status widget on phones), one row per job -- tab icon, label, campaign, elapsed time, stage text, scaleX progress bar. Click = jump to that tab and campaign. Done rows auto-dismiss after 15 s; errors stay until closed. Transform/opacity only.
+
+Verified end-to-end (Playwright, headless): start run on cmp-001 -> switch to Data Bisnis (tray: "Tahap 1/6 · Briefing & strategi kampanye", 7 s) -> switch to Visual Aset -> tray reaches "COMPLETE · 7/7 stage · 2 perlu input Anda" (36 s) -> back to Orchestrator: result, ledger and "Perlu Input Anda" present without re-running; header campaign still cmp-001; clicking the tray row from another tab lands on the result. Separately, the progress route was polled from a second process while a run was in flight: labels advanced plan -> keyword -> content -> audit -> handoff -> image, finished=true at the end.
+
+Not moved to the Job Center (deliberately): the publishing hub's extension autopost. Its submit-result listener already lives at the App root (see "Autopost Publish Finalization Listener" bug), and the hub now stays mounted anyway.
+
 ## Roadmap Completion Summary (2026-09-14)
 All four phases of the approved plan are implemented. Evidence status per phase:
 - Phase 1 MD contracts: PROVEN (sentinel twice, notes on disk, then real notes from a production siege run).

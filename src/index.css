@@ -40,3 +40,8 @@
 @utility animate-du-fade-in { animation: du-fade-in 220ms ease-out both; }
 @utility animate-du-fade-out { animation: du-fade-out 200ms ease-in both; }
 @utility animate-du-panel-in { animation: du-panel-in 180ms ease-out both; }
+
+/* Job tray offset: above the bottom navigation, and on phones also above the
+   model-status widget that sits bottom-right. */
+.du-tray { bottom: calc(var(--du-bottom-nav, 0px) + 84px); }
+@media (min-width: 640px) { .du-tray { bottom: calc(var(--du-bottom-nav, 0px) + 12px); } }

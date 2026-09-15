@@ -16,7 +16,22 @@ export default defineConfig(() => {
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
-      watch: process.env.DISABLE_HMR === 'true' ? null : {},
+      // Runtime writes must never reload the page: the agents append to their own
+      // ai-agents/*.md on every call, the server persists data/*.json and rebuilds the
+      // extension zip, and images land in public/. Vite treats any of those as a
+      // full page reload, which wiped every in-progress job the moment a run finished.
+      watch: process.env.DISABLE_HMR === 'true' ? null : {
+        ignored: [
+          '**/ai-agents/**',
+          '**/data/**',
+          '**/public/generated-images/**',
+          '**/public/base-photos/**',
+          '**/public/*.zip',
+          '**/*.md',
+          '**/*.log',
+          '**/e2e-*.cjs',
+        ],
+      },
     },
   };
 });

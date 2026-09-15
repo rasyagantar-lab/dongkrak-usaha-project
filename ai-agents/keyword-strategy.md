@@ -61,3 +61,5 @@ This file is your live rulebook: the application reads it fresh and shows it to 
 - [2026-09-14] Mengombinasikan merek populer furniture knockdown dengan layanan jasa rakit panggilan dan nama kecamatan spesifik Arcamanik sangat efektif menghasilkan keyword cluster berintent komersial tinggi.
 - [2026-09-15] Menargetkan variasi kombinasi nama brand populer furniture knockdown dengan kata kunci layanan panggilan terbukti efektif memperkuat intent komersial di area perkotaan besar.
 - [2026-09-15] Mengintegrasikan kata kunci kombinasi layanan bongkar-pasang pindahan dengan merek furniture spesifik di area Jabodetabek, Bandung, dan Surabaya terbukti memperkuat intent transaksi langsung.
+- [2026-09-15] Menargetkan kombinasi layanan spesifik seperti bongkar pasang furniture apartemen di kota besar terbukti efektif menjaring segmen pelanggan berpindah tempat tinggal dengan intent konversi tinggi.
+- [2026-09-15] Mengombinasikan kata kunci spesifik layanan perakitan brand ternama dengan agregasi wilayah kota besar (Jabodetabek, Bandung, Surabaya) efektif menangkap kueri pencarian berintent transaksi tinggi.

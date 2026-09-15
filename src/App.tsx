@@ -14,11 +14,35 @@ import { VisualAssetStudio } from './components/VisualAssetStudio';
 import { MarketSiegePanel } from './components/MarketSiegePanel';
 import { WelcomeSplash } from './components/WelcomeSplash';
 import { GettingStartedGuide } from './components/GettingStartedGuide';
+import { JobTray } from './components/JobTray';
+import { JobCenterProvider } from './jobs';
 import { INITIAL_CAMPAIGNS } from './data/sampleBusinesses';
 import { Campaign, DongkrakUsahaConnectionConfig } from './types';
 
+// Every tab stays mounted; the inactive ones are display:none via [hidden]. Work in
+// progress (an orchestrator run, a realisation batch, the extension handshake in the
+// publishing hub) therefore keeps going when the user looks at another tab, and
+// their form inputs are still there when they come back. The settle-in animation
+// restarts each time a section goes from hidden to shown, so tab switches still feel
+// like a transition without any remount.
+const TabPanel: React.FC<{ id: string; active: string; children: React.ReactNode }> = ({ id, active, children }) => (
+  <section hidden={active !== id} className="animate-du-panel-in motion-reduce:animate-none">
+    {children}
+  </section>
+);
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>('business');
+  // Riwayat re-fetches on every visit (it has no in-progress work to protect).
+  const [historyVisits, setHistoryVisits] = useState(0);
+  const goToTab = (tab: string) => {
+    if (tab === 'history') setHistoryVisits(n => n + 1);
+    setActiveTab(tab);
+  };
+  const handleNavigateFromTray = (tab: string, campaignId?: string) => {
+    if (campaignId) setActiveCampaignId(campaignId);
+    goToTab(tab);
+  };
   const [campaigns, setCampaigns] = useState<Campaign[]>(INITIAL_CAMPAIGNS);
   const [activeCampaignId, setActiveCampaignId] = useState<string>(INITIAL_CAMPAIGNS[0].id);
 
@@ -213,91 +237,93 @@ export default function App() {
   };
 
   return (
+    <JobCenterProvider>
     <div className="min-h-screen bg-slate-100 text-slate-800 flex flex-col font-sans">
       <WelcomeSplash />
 
       <Header
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={goToTab}
         campaigns={campaigns}
         activeCampaignId={activeCampaignId}
         setActiveCampaignId={setActiveCampaignId}
         connectionConfig={connectionConfig}
       />
 
-      {/* Keyed on BOTH the tab and the active campaign. Every per-campaign panel seeds
-          local state from the campaign prop once on mount (form fields, orchestrator
-          results, caption drafts); without the campaign id in the key, switching
-          campaigns in the header dropdown left the old campaign's data on screen --
-          and "Terapkan ke Campaign" could write campaign A's results into campaign B.
-          Remounting also re-triggers the short settle-in animation. */}
-      <main key={`${activeTab}:${activeCampaign?.id || ''}`} className="flex-1 p-4 sm:p-6 lg:p-8 animate-du-panel-in motion-reduce:animate-none">
-        {activeTab === 'orchestrator' && (
+      {/* Each per-campaign panel is keyed on the active campaign: they seed local state
+          from the campaign prop once on mount, and without the key switching campaigns in
+          the header dropdown left the old campaign's data on screen. The tab itself is no
+          longer part of the key -- see TabPanel. Long-running work is held by the Job
+          Center, so a campaign switch mid-run loses nothing either. */}
+      <main className="flex-1 p-4 sm:p-6 lg:p-8">
+        <TabPanel id="orchestrator" active={activeTab}>
           <OrchestratorPanel
+            key={`orch:${activeCampaign?.id || ''}`}
             campaign={activeCampaign}
             onUpdateCampaign={handleUpdateCampaign}
           />
-        )}
+        </TabPanel>
 
-        {activeTab === 'business' && (
+        <TabPanel id="business" active={activeTab}>
           <div className="max-w-5xl mx-auto mb-6">
-            <GettingStartedGuide onGoTo={setActiveTab} />
+            <GettingStartedGuide onGoTo={goToTab} />
           </div>
-        )}
-        {activeTab === 'business' && (
           <BusinessManager
+            key={`biz:${activeCampaign?.id || ''}`}
             campaign={activeCampaign}
             onUpdateCampaign={handleUpdateCampaign}
             onAddNewCampaign={handleAddNewCampaign}
             onDeleteCampaign={handleDeleteCampaign}
           />
-        )}
+        </TabPanel>
 
-        {activeTab === 'market-siege' && (
+        <TabPanel id="market-siege" active={activeTab}>
           <MarketSiegePanel
             campaigns={campaigns}
             onReloadCampaigns={handleReloadCampaigns}
             onUpdateCampaign={handleUpdateCampaign}
           />
-        )}
+        </TabPanel>
 
-        {activeTab === 'visual-asset' && (
+        <TabPanel id="visual-asset" active={activeTab}>
           <VisualAssetStudio
+            key={`visual:${activeCampaign?.id || ''}`}
             campaign={activeCampaign}
             onUpdateCampaign={handleUpdateCampaign}
           />
-        )}
+        </TabPanel>
 
-        {activeTab === 'dongkrak-preview' && (
+        <TabPanel id="dongkrak-preview" active={activeTab}>
           <DongkrakUsahaPreview
+            key={`preview:${activeCampaign?.id || ''}`}
             campaign={activeCampaign}
             onUpdateCampaign={handleUpdateCampaign}
-            onNavigatePublishing={() => setActiveTab('publishing-hub')}
+            onNavigatePublishing={() => goToTab('publishing-hub')}
           />
-        )}
+        </TabPanel>
 
-        {activeTab === 'publishing-hub' && (
+        <TabPanel id="publishing-hub" active={activeTab}>
           <PublishingHub
             campaigns={campaigns}
             activeCampaign={activeCampaign}
             connectionConfig={connectionConfig}
             onUpdateCampaign={handleUpdateCampaign}
-            onNavigateSettings={() => setActiveTab('connection-settings')}
-            onNavigateHistory={() => setActiveTab('history')}
+            onNavigateSettings={() => goToTab('connection-settings')}
+            onNavigateHistory={() => goToTab('history')}
             pendingAutopostCampaignRef={pendingAutopostCampaignRef}
           />
-        )}
+        </TabPanel>
 
-        {activeTab === 'connection-settings' && (
+        <TabPanel id="connection-settings" active={activeTab}>
           <ConnectionSettings
             connectionConfig={connectionConfig}
             onUpdateConnection={handleUpdateConnection}
           />
-        )}
+        </TabPanel>
 
-        {activeTab === 'history' && (
-          <PublishingHistory />
-        )}
+        <TabPanel id="history" active={activeTab}>
+          <PublishingHistory key={`history:${historyVisits}`} />
+        </TabPanel>
       </main>
 
       <footer className="bg-white border-t border-slate-200 py-4 px-6 text-center text-xs text-slate-400">
@@ -305,6 +331,8 @@ export default function App() {
       </footer>
       
       <ModelStatusIndicator />
+      <JobTray onNavigate={handleNavigateFromTray} />
     </div>
+    </JobCenterProvider>
   );
 }
