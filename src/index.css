@@ -39,9 +39,48 @@
 @utility animate-du-scale-out { animation: du-fade-scale-out 200ms ease-in both; }
 @utility animate-du-fade-in { animation: du-fade-in 220ms ease-out both; }
 @utility animate-du-fade-out { animation: du-fade-out 200ms ease-in both; }
-@utility animate-du-panel-in { animation: du-panel-in 180ms ease-out both; }
+@utility animate-du-panel-in { animation: du-panel-in 240ms cubic-bezier(0.16, 1, 0.3, 1) both; }
 
 /* Job tray offset: above the bottom navigation, and on phones also above the
    model-status widget that sits bottom-right. */
 .du-tray { bottom: calc(var(--du-bottom-nav, 0px) + 84px); }
 @media (min-width: 640px) { .du-tray { bottom: calc(var(--du-bottom-nav, 0px) + 12px); } }
+
+/* ---- Bottom navigation + shared motion utilities (2026-09-15) ---- */
+:root { --du-bottom-nav: 60px; }
+.du-bottom-nav {
+  height: calc(var(--du-bottom-nav) + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.du-above-nav { bottom: calc(var(--du-bottom-nav, 0px) + 12px); }
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
+
+/* Springy overshoot for the nav bubble's glide. */
+@utility ease-du-spring { transition-timing-function: cubic-bezier(0.34, 1.4, 0.64, 1); }
+
+/* The bubble squashes slightly as it lands under the tab. */
+@keyframes du-bubble {
+  0%   { transform: scale(1); }
+  45%  { transform: scale(1.06, 1.14); }
+  100% { transform: scale(1); }
+}
+@utility animate-du-bubble { animation: du-bubble 380ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+/* Running-job badge: opacity pulse only. */
+@keyframes du-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+@utility animate-du-pulse { animation: du-pulse 1.4s ease-in-out infinite; }
+
+/* Staggered rise for splash lines (pair with an inline animation-delay). */
+@keyframes du-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@utility animate-du-rise { animation: du-rise 520ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* Slow breathing for the splash logo mark. */
+@keyframes du-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+@utility animate-du-breathe { animation: du-breathe 3.2s ease-in-out infinite; }

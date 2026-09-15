@@ -61,7 +61,7 @@ export const GettingStartedGuide: React.FC<GettingStartedGuideProps> = ({ onGoTo
           </div>
           <div>
             <div className="text-sm font-bold text-slate-900">Cara pakai aplikasi ini</div>
-            <div className="text-2xs text-slate-500">Lima langkah, dari data bisnis sampai listing terbit. Tab di atas sudah diurutkan sesuai langkah.</div>
+            <div className="text-2xs text-slate-500">Lima langkah, dari data bisnis sampai listing terbit. Tab di bawah layar sudah diurutkan sesuai langkah.</div>
           </div>
         </div>
         {collapsed ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronUp className="w-4 h-4 text-slate-400" />}
@@ -70,7 +70,7 @@ export const GettingStartedGuide: React.FC<GettingStartedGuideProps> = ({ onGoTo
       {!collapsed && (
         <div className="px-5 pb-3">
           <div className="bg-white border border-blue-200 rounded-lg p-3 text-2xs text-slate-700 leading-relaxed">
-            <span className="font-bold text-slate-900">Apa itu "Campaign" di dropdown atas?</span> Satu campaign = satu listing yang
+            <span className="font-bold text-slate-900">Apa itu "Campaign" di dropdown di header?</span> Satu campaign = satu listing yang
             akan diterbitkan = data bisnis + satu area target + semua hasil AI-nya. Satu bisnis boleh punya banyak campaign
             (misalnya satu per kecamatan). Dropdown itu memilih <span className="font-semibold">campaign mana yang sedang dikerjakan</span> --
             semua tab (Data Bisnis, Orchestrator, Visual, Preview, Publish) selalu menampilkan campaign yang dipilih di sana.

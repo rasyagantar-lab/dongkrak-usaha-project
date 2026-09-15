@@ -570,6 +570,19 @@ Verified: content/background pass `node --check`; `tsc` clean; the finder run in
 
 To verify on the real site (operator): reinstall/reload the extension from the new zip, log in to DongkrakUsaha, press the button in the Publish tab. Expected: the list tab opens, the form opens, the status line names the matched button and the landed URL -- record that URL here; it becomes the proven direct link. If it reports NOT_FOUND, the listed visible buttons tell us what the real label is.
 
+## UI Pass 2: Bottom Navigation, New Splash, Stale Copy Removed (2026-09-15)
+Status: DONE and VERIFIED (headless Chromium at 1280 px and 400 px; no page errors; no horizontal overflow).
+
+User requests: macOS-like smooth animation that stays light on low-end devices; a splash they actually like (the first was disliked); tabs at the BOTTOM with a wipe/bubble animation that stays on the active tab; remove useless/out-of-date interface such as the "Phase 1" extension naming -- but keep the extension console panel.
+
+- `src/components/BottomNav.tsx` (new): fixed bottom bar, 8 tabs (1-6 numbered flow + Koneksi + Riwayat). One blue pill sits under the active tab and GLIDES to the clicked one -- `transform: translateX()` with a spring curve (`cubic-bezier(0.34, 1.4, 0.64, 1)`, measured overshoot 821 px -> 799 px), then an inner layer does a small squash-bounce on landing (`du-bubble` keyframe, keyed on the tab so it re-triggers). Width is set instantly, never animated. Tabs with a running background job show a pulsing count badge (opacity only). On phones the bar scrolls horizontally with short labels and keeps the active tab in view; `env(safe-area-inset-bottom)` respected. Height is the CSS var `--du-bottom-nav` (60 px); the root container pads by it, and the model-status widget + job tray offset from it (`.du-above-nav`, `.du-tray`).
+- `Header.tsx`: the old top tab row is gone; it is now the identity strip + campaign picker + connection badge (subtitle hidden on phones). Badge "v2.4 Pro" -> "v2.5".
+- `WelcomeSplash.tsx` rewritten: soft gradient/blob backdrop (static, no filters), breathing logo mark (scale 1 -> 1.06, 3.2 s), seven blocks that rise in sequence (`du-rise`, staggered `animation-delay`), the three-step promise, credits in a two-column card, "Mulai", and a "Jangan tampilkan lagi" checkbox (localStorage) on top of the once-per-session rule. Still transform/opacity only; everything gated by `motion-reduce:`.
+- `PublishingHub.tsx`: "Phase 1: Real Extension Inspection & Login Bootstrap" badge -> "Ekstensi Chrome v1.1"; mode button "Real Extension Bridge (Phase 1)" -> "Ekstensi Chrome"; the "Phase 1: Read-Only Inspection Mode" banner deleted outright (it claimed the extension never fills or submits -- false since autopost shipped); zip description now lists what the extension actually does. The "Developer Extension Architecture Diagnostics" console panel is untouched, as asked. Footer credits the developer and pembimbing. Getting-started guide copy updated ("Tab di bawah layar").
+- `index.css`: new utilities `ease-du-spring`, `animate-du-bubble`, `animate-du-pulse`, `animate-du-rise`, `animate-du-breathe`, `no-scrollbar` (was referenced but never defined); panel-in eased to 240 ms expo-out.
+
+Verified: build clean; screenshots at both widths reviewed (splash, orchestrator, publish); nav bottom edge == viewport bottom; `scrollWidth == viewport width` at 400 px; 0 "Phase 1" strings visible in the Publish tab; splash suppressed on reload within the session.
+
 ## Roadmap Completion Summary (2026-09-14)
 All four phases of the approved plan are implemented. Evidence status per phase:
 - Phase 1 MD contracts: PROVEN (sentinel twice, notes on disk, then real notes from a production siege run).

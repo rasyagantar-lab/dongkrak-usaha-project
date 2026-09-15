@@ -1,22 +1,9 @@
 import React from 'react';
-import { 
-  Building2, 
-  Eye, 
-  Send, 
-  Settings, 
-  History, 
-  Globe,
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
-  Workflow,
-  Image as ImageIcon,
-  MapPinned
-} from 'lucide-react';
+import { Globe, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 import { Campaign, DongkrakUsahaConnectionConfig } from '../types';
 
+// Navigation lives in BottomNav now; the header is the identity strip + campaign picker.
 interface HeaderProps {
-  activeTab: string;
   setActiveTab: (tab: string) => void;
   campaigns: Campaign[];
   activeCampaignId: string;
@@ -25,7 +12,6 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  activeTab,
   setActiveTab,
   campaigns,
   activeCampaignId,
@@ -68,20 +54,6 @@ export const Header: React.FC<HeaderProps> = ({
     );
   };
 
-  // Ordered as the actual work order, and numbered, so a first-time operator can
-  // read the flow left-to-right: data in -> (optionally) multiply per area -> let the
-  // AI do everything -> picture -> publish. Connection and Riwayat are utilities.
-  const navItems = [
-    { id: 'business', label: '1. Data Bisnis', icon: Building2 },
-    { id: 'market-siege', label: '2. Kepung Pasar', icon: MapPinned },
-    { id: 'orchestrator', label: '3. AI Orchestrator', icon: Workflow },
-    { id: 'visual-asset', label: '4. Visual Aset', icon: ImageIcon },
-    { id: 'dongkrak-preview', label: '5. Preview', icon: Eye },
-    { id: 'publishing-hub', label: '6. Publish', icon: Send },
-    { id: 'connection-settings', label: 'Koneksi', icon: Settings },
-    { id: 'history', label: 'Riwayat', icon: History }
-  ];
-
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
       {/* Top Banner */}
@@ -96,11 +68,11 @@ export const Header: React.FC<HeaderProps> = ({
                 DongkrakUsaha AI Marketing Suite
               </h1>
               <span className="bg-blue-50 text-blue-700 text-2xs font-semibold px-2 py-0.5 rounded-md border border-blue-200">
-                v2.4 Pro
+                v2.5
               </span>
             </div>
-            <p className="text-xs text-slate-500">
-              Otomatisasi Local SEO, AI Quality Control & Direct Publishing DongkrakUsaha
+            <p className="text-xs text-slate-500 hidden sm:block">
+              Local SEO, AI quality control, dan publikasi langsung ke DongkrakUsaha
             </p>
           </div>
         </div>
@@ -142,29 +114,6 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Navigation Tabs */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <nav className="flex space-x-1 sm:space-x-3 overflow-x-auto no-scrollbar py-1">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-md text-xs font-medium whitespace-nowrap transition-all ${
-                  isActive
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                }`}
-              >
-                <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-500'}`} />
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-      </div>
     </header>
   );
 };

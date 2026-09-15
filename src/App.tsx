@@ -15,6 +15,7 @@ import { MarketSiegePanel } from './components/MarketSiegePanel';
 import { WelcomeSplash } from './components/WelcomeSplash';
 import { GettingStartedGuide } from './components/GettingStartedGuide';
 import { JobTray } from './components/JobTray';
+import { BottomNav } from './components/BottomNav';
 import { JobCenterProvider } from './jobs';
 import { INITIAL_CAMPAIGNS } from './data/sampleBusinesses';
 import { Campaign, DongkrakUsahaConnectionConfig } from './types';
@@ -238,11 +239,10 @@ export default function App() {
 
   return (
     <JobCenterProvider>
-    <div className="min-h-screen bg-slate-100 text-slate-800 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-100 text-slate-800 flex flex-col font-sans" style={{ paddingBottom: 'var(--du-bottom-nav)' }}>
       <WelcomeSplash />
 
       <Header
-        activeTab={activeTab}
         setActiveTab={goToTab}
         campaigns={campaigns}
         activeCampaignId={activeCampaignId}
@@ -327,11 +327,12 @@ export default function App() {
       </main>
 
       <footer className="bg-white border-t border-slate-200 py-4 px-6 text-center text-xs text-slate-400">
-        DongkrakUsaha AI Marketing Suite & Direct Publishing Adapter • Powered by Google Gemini AI
+        DongkrakUsaha AI Marketing Suite • Dibuat oleh Muhamad Rasya Ramadhan (PKL SMK Yadika 5) • Pembimbing: Aceng Komarudin
       </footer>
       
       <ModelStatusIndicator />
       <JobTray onNavigate={handleNavigateFromTray} />
+      <BottomNav activeTab={activeTab} setActiveTab={goToTab} />
     </div>
     </JobCenterProvider>
   );

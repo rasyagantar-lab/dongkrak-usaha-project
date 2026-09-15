@@ -111,7 +111,7 @@ export const ModelStatusIndicator: React.FC = () => {
       : 'bg-amber-50 text-amber-600';
 
   return (
-    <div className="fixed bottom-4 right-4 z-50">
+    <div className="fixed du-above-nav right-4 z-50">
       <div className={`bg-white rounded-xl shadow-lg border p-3 flex flex-col gap-2 transition-all ${allReady ? 'border-slate-200' : 'border-amber-300'}`}>
         <div
           className="flex items-center gap-3 cursor-pointer select-none"

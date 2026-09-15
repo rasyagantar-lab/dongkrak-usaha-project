@@ -935,7 +935,7 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
               Publishing & Distribution Hub
             </h2>
             <span className="text-3xs font-bold bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded border border-blue-200">
-              Phase 1: Real Extension Inspection & Login Bootstrap
+              Ekstensi Chrome v1.1
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">
@@ -970,7 +970,7 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
           }`}
         >
           <Puzzle className="w-3.5 h-3.5 text-blue-600" />
-          Real Extension Bridge (Phase 1)
+          Ekstensi Chrome
         </button>
         <button
           onClick={() => setPublisherMode('MANUAL')}
@@ -1059,20 +1059,9 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
         </div>
       )}
 
-      {/* EXTENSION PUBLISHER (PHASE 1 REAL BRIDGE + LOGIN BOOTSTRAP) */}
+      {/* EXTENSION PUBLISHER */}
       {publisherMode === 'EXTENSION' && (
         <div className="space-y-6">
-          {/* Phase 1 Read-Only Notice Banner */}
-          <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900 flex items-start gap-3">
-            <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <span className="font-bold block text-sm">Phase 1: Read-Only Inspection Mode</span>
-              <p className="text-blue-800 leading-relaxed">
-                Di fase ini, <strong>Chrome Extension</strong> melakukan inspeksi riil terhadap tab browser DongkrakUsaha, status otentikasi login, serta struktur form HTML DOM tanpa mengubah data atau mensubmit secara otomatis.
-              </p>
-            </div>
-          </div>
-
           {/* 4 Distinct Connection Status Cards */}
           <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 pb-3">
@@ -1523,7 +1512,7 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
               <div className="p-4 bg-slate-800 rounded-xl border border-slate-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
                   <span className="font-bold text-white text-sm block">Paket Ekstensi Manifest V3 Siap Pakai</span>
-                  <span className="text-2xs text-slate-400">Berisi kode riil Phase 1: deteksi tab, pemeriksaan sesi auth DOM, & field discovery.</span>
+                  <span className="text-2xs text-slate-400">Deteksi tab & sesi login, pembacaan field form, isi otomatis, submit dengan konfirmasi, dan klik "Input Produk".</span>
                 </div>
                 <button
                   onClick={handleDownloadExtensionZip}
