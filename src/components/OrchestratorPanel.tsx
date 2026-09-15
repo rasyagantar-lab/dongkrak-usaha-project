@@ -9,7 +9,9 @@ import {
   AlertTriangle,
   Cpu,
   ArrowRightLeft,
-  Download
+  Download,
+  UserRoundPen,
+  Save
 } from 'lucide-react';
 import { Campaign } from '../types';
 
@@ -27,6 +29,29 @@ interface LedgerEntry {
   durationMs: number;
 }
 
+// A finding the auditor says only the business owner can resolve (data, not copy).
+interface HumanFinding {
+  type: 'pass' | 'warning' | 'error';
+  category: string;
+  message: string;
+  fixableBy?: 'ai' | 'human';
+  field?: 'targetCities' | 'address' | 'phoneWhatsApp' | 'businessName' | 'category' | 'description' | 'productsServices' | 'priceRange' | 'website' | 'other';
+  suggestion?: string;
+}
+
+const FIELD_LABELS: Record<NonNullable<HumanFinding['field']>, string> = {
+  targetCities: 'Nama daerah / kota target',
+  address: 'Alamat usaha',
+  phoneWhatsApp: 'Nomor WhatsApp',
+  businessName: 'Nama bisnis',
+  category: 'Kategori bisnis',
+  description: 'Deskripsi bisnis',
+  productsServices: 'Produk / layanan',
+  priceRange: 'Kisaran harga',
+  website: 'Website',
+  other: 'Lainnya'
+};
+
 interface OrchestratorRun {
   ok: boolean;
   pipelineStatus: 'COMPLETE' | 'PARTIAL' | 'FAILED';
@@ -40,6 +65,7 @@ interface OrchestratorRun {
     audit?: any;
     imageBrief?: any;
   };
+  humanActionRequired?: HumanFinding[];
   revisionHistory?: {
     round: number;
     scoreBefore: number;
@@ -76,7 +102,11 @@ export const OrchestratorPanel: React.FC<OrchestratorPanelProps> = ({ campaign, 
   const [error, setError] = useState<string | null>(null);
   const [applied, setApplied] = useState(false);
 
-  const handleRun = async () => {
+  // Draft values for the "Perlu Input Anda" editors, keyed by field.
+  const [humanEdits, setHumanEdits] = useState<Record<string, string>>({});
+
+  const handleRun = async (override?: Campaign) => {
+    const target = override || campaign;
     setIsRunning(true);
     setError(null);
     setRun(null);
@@ -87,9 +117,9 @@ export const OrchestratorPanel: React.FC<OrchestratorPanelProps> = ({ campaign, 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          businessData: campaign.businessData,
+          businessData: target.businessData,
           objective,
-          campaign
+          campaign: target
         })
       });
       const data = await response.json();
@@ -119,6 +149,47 @@ export const OrchestratorPanel: React.FC<OrchestratorPanelProps> = ({ campaign, 
 
   const hasApplicableOutput = !!(run?.outputs.seoStrategy || run?.outputs.generatedContent || run?.outputs.audit);
 
+  const humanFindings = (run?.humanActionRequired || []).filter(f => f.fixableBy === 'human');
+  const humanFields = [...new Set(humanFindings.map(f => f.field || 'other'))] as NonNullable<HumanFinding['field']>[];
+
+  const currentValueFor = (field: NonNullable<HumanFinding['field']>): string => {
+    const b = campaign.businessData;
+    switch (field) {
+      case 'targetCities': return (b.targetCities || []).join(', ');
+      case 'productsServices': return (b.productsServices || []).join(', ');
+      case 'businessName': return b.name || '';
+      case 'other': return '';
+      default: return String((b as any)[field] ?? '');
+    }
+  };
+  const editValue = (field: NonNullable<HumanFinding['field']>) =>
+    field in humanEdits ? humanEdits[field] : currentValueFor(field);
+
+  // Builds the corrected campaign from the editors. targetCities is mirrored into
+  // seoStrategy.targetCities so the next run's keyword/content stages see the fix.
+  const applyHumanEdits = (): Campaign => {
+    const b: any = { ...campaign.businessData };
+    for (const field of humanFields) {
+      if (!(field in humanEdits) || field === 'other') continue;
+      const v = humanEdits[field];
+      if (field === 'targetCities' || field === 'productsServices') {
+        b[field] = v.split(/[\n,]+/).map(x => x.trim()).filter(Boolean);
+      } else if (field === 'businessName') {
+        b.name = v.trim();
+      } else {
+        b[field] = v.trim();
+      }
+    }
+    return {
+      ...campaign,
+      businessData: b,
+      seoStrategy: { ...campaign.seoStrategy, targetCities: b.targetCities },
+      updatedAt: new Date().toISOString()
+    };
+  };
+  const handleSaveHumanEdits = () => { onUpdateCampaign(applyHumanEdits()); };
+  const handleSaveAndRerun = () => { const fixed = applyHumanEdits(); onUpdateCampaign(fixed); setHumanEdits({}); handleRun(fixed); };
+
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Header */}
@@ -131,7 +202,7 @@ export const OrchestratorPanel: React.FC<OrchestratorPanelProps> = ({ campaign, 
             </h2>
             <p className="text-xs text-slate-500 mt-1">
               Menjalankan seluruh spesialis secara berurutan: Strategy → Keyword → Content → Audit → Image Brief.
-              Setiap agent memakai API key dan jatah quota-nya sendiri.
+              Temuan audit yang bisa diperbaiki AI direvisi otomatis; yang butuh data dari Anda diserahkan lewat kolom "Perlu Input Anda".
             </p>
           </div>
         </div>
@@ -153,7 +224,7 @@ export const OrchestratorPanel: React.FC<OrchestratorPanelProps> = ({ campaign, 
               Bisnis aktif: <strong className="text-slate-700">{campaign.businessData.name}</strong>
             </span>
             <button
-              onClick={handleRun}
+              onClick={() => handleRun()}
               disabled={isRunning || !objective.trim()}
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-lg disabled:opacity-50 cursor-pointer"
             >
@@ -295,6 +366,85 @@ export const OrchestratorPanel: React.FC<OrchestratorPanelProps> = ({ campaign, 
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Hand-off: findings only the owner can fix */}
+          {humanFindings.length > 0 && (
+            <div className="bg-white border-2 border-amber-300 rounded-xl shadow-xs p-4 space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-lg bg-amber-500 flex items-center justify-center text-white shrink-0">
+                  <UserRoundPen className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Perlu Input Anda</h3>
+                  <p className="text-2xs text-slate-600 mt-0.5 leading-relaxed">
+                    Audit menemukan {humanFindings.length} masalah yang <strong>bukan soal tulisan</strong> tapi soal data —
+                    AI sengaja tidak mengarang jawabannya. Perbaiki di bawah, lalu jalankan ulang.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {humanFields.map(field => {
+                  const related = humanFindings.filter(f => (f.field || 'other') === field);
+                  const isList = field === 'targetCities' || field === 'productsServices';
+                  const isLong = field === 'description';
+                  return (
+                    <div key={field} className="bg-amber-50/60 border border-amber-200 rounded-lg p-3 space-y-2">
+                      <div className="text-xs font-bold text-slate-800">{FIELD_LABELS[field]}</div>
+                      <ul className="space-y-1">
+                        {related.map((f, i) => (
+                          <li key={i} className="text-2xs text-slate-700">
+                            <span className={f.type === 'error' ? 'text-rose-600 font-bold' : 'text-amber-700 font-bold'}>
+                              {f.type === 'error' ? '✕ ' : '! '}
+                            </span>
+                            {f.message}
+                            {f.suggestion && <span className="block text-slate-500 mt-0.5">→ {f.suggestion}</span>}
+                          </li>
+                        ))}
+                      </ul>
+                      {field !== 'other' && (
+                        isLong ? (
+                          <textarea
+                            rows={3}
+                            value={editValue(field)}
+                            onChange={e => setHumanEdits(p => ({ ...p, [field]: e.target.value }))}
+                            className="w-full text-xs border border-slate-300 rounded-lg p-2.5 bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                          />
+                        ) : (
+                          <input
+                            type="text"
+                            value={editValue(field)}
+                            onChange={e => setHumanEdits(p => ({ ...p, [field]: e.target.value }))}
+                            placeholder={isList ? 'Pisahkan dengan koma, mis. Ciputat, Pamulang' : ''}
+                            className="w-full text-xs border border-slate-300 rounded-lg p-2.5 bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                          />
+                        )
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
+                <button
+                  onClick={handleSaveHumanEdits}
+                  disabled={isRunning || Object.keys(humanEdits).length === 0}
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-lg disabled:opacity-50"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  Simpan ke Campaign
+                </button>
+                <button
+                  onClick={handleSaveAndRerun}
+                  disabled={isRunning || Object.keys(humanEdits).length === 0}
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-lg disabled:opacity-50"
+                >
+                  {isRunning ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                  Simpan & Jalankan Ulang
+                </button>
               </div>
             </div>
           )}
@@ -441,7 +591,16 @@ export const OrchestratorPanel: React.FC<OrchestratorPanelProps> = ({ campaign, 
                           }`}>
                             {f.type === 'error' ? '✕' : f.type === 'warning' ? '!' : '✓'}
                           </span>
-                          <span><span className="font-semibold">{f.category}:</span> {f.message}</span>
+                          <span>
+                            <span className="font-semibold">{f.category}:</span> {f.message}
+                            {f.type !== 'pass' && (
+                              <span className={`ml-1.5 inline-block text-3xs font-bold px-1 py-0.5 rounded ${
+                                f.fixableBy === 'human' ? 'bg-amber-200 text-amber-900' : 'bg-violet-100 text-violet-800'
+                              }`}>
+                                {f.fixableBy === 'human' ? 'PERLU ANDA' : 'DIPERBAIKI AI'}
+                              </span>
+                            )}
+                          </span>
                         </li>
                       ))}
                     </ul>

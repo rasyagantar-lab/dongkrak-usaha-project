@@ -62,3 +62,6 @@ This file is your live rulebook: the application reads it fresh and shows it to 
 
 ## Self-Improvement Log (auto-recorded)
 - [2026-09-14] Memasukkan rentang harga resmi serta daftar merek mebel knockdown spesifik secara alami meningkatkan trust score tanpa terkesan memaksakan kata kunci.
+- [2026-09-14] Penyebutan nama merek mebel populer secara natural di dalam deskripsi memperkuat relevansi pencarian lokal tanpa terdeteksi sebagai keyword stuffing.
+- [2026-09-15] Menyajikan perbandingan risiko rakit sendiri vs profesional secara terstruktur membantu meningkatkan tingkat konversi tanpa terkesan agresif.
+- [2026-09-15] Mengganti placeholder daerah dengan gabungan wilayah cakupan resmi (Jabodetabek, Bandung, Surabaya) terbukti efektif mengatasi peringatan audit lokasi tanpa melakukan keyword stuffing.

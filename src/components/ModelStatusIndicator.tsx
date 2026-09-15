@@ -15,11 +15,30 @@ interface ModelSlot {
   status: SlotStatus;
   available: boolean;
   cooldownSecondsLeft: number;
+  quotaScope?: 'minute' | 'day' | 'none' | 'unknown';
+  retryAfterSeconds?: number;
   successCount: number;
   failureCount: number;
   lastErrorStatus?: number;
   lastErrorMessage?: string;
 }
+
+// Human wording for a slot that is not available right now. Quota is split into the
+// three very different situations the provider actually reports, because "quota
+// exhausted 15m" hid the difference between "wait 30 seconds" and "this model has no
+// free allowance for this key at all".
+const unavailableLabel = (model: ModelSlot): string => {
+  if (model.status === 'QUOTA_EXHAUSTED') {
+    if (model.quotaScope === 'none') return 'tanpa jatah gratis (limit 0)';
+    if (model.quotaScope === 'minute') return `limit per menit${model.retryAfterSeconds ? ` · coba lagi ${model.retryAfterSeconds} dtk` : ''}`;
+    if (model.quotaScope === 'day') return 'limit harian habis';
+    return 'quota habis';
+  }
+  if (model.status === 'MODEL_NOT_FOUND') return 'model tidak ditemukan (404)';
+  if (model.status === 'TEMPORARILY_UNAVAILABLE') return 'sementara tidak tersedia';
+  if (model.status === 'NO_KEY') return 'key belum diisi';
+  return model.status.replace(/_/g, ' ').toLowerCase();
+};
 
 interface AgentStatus {
   feature: string;
@@ -188,8 +207,8 @@ export const ModelStatusIndicator: React.FC = () => {
                             ) : (
                               <span className="text-red-600 font-semibold shrink-0 flex items-center gap-1">
                                 <Clock className="w-2.5 h-2.5" />
-                                {model.status.replace(/_/g, ' ').toLowerCase()}
-                                {model.cooldownSecondsLeft > 0 && ` ${formatCooldown(model.cooldownSecondsLeft)}`}
+                                {unavailableLabel(model)}
+                                {model.cooldownSecondsLeft > 0 && model.quotaScope !== 'minute' && ` ${formatCooldown(model.cooldownSecondsLeft)}`}
                               </span>
                             )}
                           </div>

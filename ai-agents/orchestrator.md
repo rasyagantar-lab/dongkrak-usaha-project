@@ -82,6 +82,12 @@ The builder checks these files before changing the application. Runtime orchestr
 - Every round is recorded in the ledger as `content-revisi-N` / `audit-ulang-N`, and summarised in `revisionHistory` with score before/after and whether it was accepted.
 - Observed behaviour on the first live run: audit `WARNINGS` at 88, revision produced 85, revision correctly discarded, original retained.
 
+## Hand-off Before Revision (2026-09-15)
+- Audit findings are classified `fixableBy: "ai" | "human"` (see quality-audit.md). While ANY human-required finding exists -- wrong/placeholder area name, missing WhatsApp or address -- the orchestrator does NOT run revision rounds. It records a `handoff` ledger entry and returns `humanActionRequired[]` so the operator gets editable fields for exactly those data points.
+- Why: copy complaints are almost always downstream of the data problem; rewriting on top of a placeholder area name spent two rounds and four LLM calls changing nothing the owner would keep. Revisions now run only when everything left is a copy problem.
+- The briefing (stage 0) and strategy (stage 1) run concurrently; they use different keys and the briefing feeds nothing downstream.
+- Measured on the same campaign: 111 s with two futile revision rounds -> 36 s with a clean hand-off.
+
 ## Batch Realisation From Market Siege (2026-09-14)
 - The "Kepung Pasar" tab can invoke this orchestrator for many sibling campaigns in one user action. Each sibling is a Draft clone of one parent, laser-targeted at a single kecamatan, produced by pure text substitution with NO AI call (`POST /api/campaigns/siege`).
 - The per-call contract is unchanged: the panel calls `POST /api/orchestrator/run` once per selected clone, strictly one at a time, never in parallel. Every specialist draws on a shared per-key Gemini allowance; parallel runs would only race each other into 429s. No server-side batch orchestrator route exists by design.
@@ -101,5 +107,5 @@ Do not invent unavailable models, hidden tools, or unsupported APIs. Use only do
 ## Self-Improvement Log (auto-recorded)
 - [2026-09-14] Menyoroti merek furniture populer seperti IKEA dan Informa bersama nama kota target Ciputat secara konsisten memperkuat relevansi pencarian lokal.
 - [2026-09-14] Menggabungkan nama merek furniture populer seperti IKEA dan Informa dengan nama lokasi spesifik Andir secara konsisten meningkatkan relevansi pencarian niat lokal.
-- [2026-09-14] Menyoroti nama merek furniture populer seperti IKEA dan Informa bersama lokasi spesifik Andir secara konsisten memperkuat relevansi pencarian niat lokal.
 - [2026-09-14] Menyoroti merek furniture populer seperti IKEA, Informa, dan Dekoruma bersama nama lokasi spesifik Antapani secara konsisten memperkuat relevansi pencarian niat lokal.
+- [2026-09-15] Menekankan garansi perakitan presisi serta penyebutan merek furniture populer (IKEA, Informa, Dekoruma) secara konsisten memperkuat daya tarik penawaran jasa panggilan di kota-kota besar.

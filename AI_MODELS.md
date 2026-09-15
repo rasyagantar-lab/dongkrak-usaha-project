@@ -111,6 +111,13 @@ This design keeps the system efficient, auditable, and quota-aware.
 - Legacy `api-inference.huggingface.co` is dead (the hostname no longer resolves); anything referencing it is obsolete.
 - STATUS: Cloudflare PROVEN 2026-09-14 with a real token -- first live call returned a 1024x1024 image in 2.3 s, and the full base-photo -> agent caption -> local compose chain was visually reviewed as listing-ready. Hugging Face remains implemented but UNVERIFIED (no token); given Cloudflare's result it is a low-priority fallback, and Rule 4 still applies to it.
 
+### Rule 1K: Quota scope, retired models, and transient storms (2026-09-15)
+- A 429 is parsed, not guessed: `minute` (cool for the provider's retryDelay), `day` (cool 1 h), `none` = "limit: 0", no free allowance (cool 24 h). The status API and widget show which one it was. Cooldowns are persisted (`data/model-slots.json`) so restarts do not forget.
+- A 404 "no longer available to new users" marks the model RETIRED for every key and every feature (`data/retired-models.json`), and it is dropped from all chains at boot. Discovery lists retired models; only a real call reveals them (Rule 4 again).
+- 503 "high demand" is a spike: cool 45 s, and if a whole chain fails on 5xx the router waits once (8-50 s) and walks it again before failing the stage. Per-call HTTP timeout 60 s.
+- Text agents request low thinking effort (`thinkingConfig.thinkingLevel: "low"`) -- rules arrive in the prompt, deliberation is waste; a 49 s audit call was the symptom. Any model that rejects the parameter (400) is remembered and retried without it.
+- Rule 3's "retry twice" is superseded by this rule's parsed cooldowns + one storm-wait; do not add blind retries on top.
+
 ### Rule 2: Fallback chain
 Each feature must define a strict fallback order, for example:
 - Primary model / primary key

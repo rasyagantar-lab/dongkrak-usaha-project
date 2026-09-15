@@ -58,3 +58,6 @@ This file is your live rulebook: the application reads it fresh and shows it to 
 - [2026-09-14] Menggabungkan merek ternama furniture knockdown dengan kueri transaksi 'jasa rakit panggilan' dan lokasi 'Andir' menciptakan keyword cluster berintent konversi sangat tinggi.
 - [2026-09-14] Menggabungkan merek populer furniture knockdown dengan layanan spesifik dan wilayah kecamatan Antapani menghasilkan klaster kata kunci komersial bernilai tinggi untuk konversi jasa panggilan.
 - [2026-09-14] Mengintegrasikan nama merek populer bersama layanan spesifik perakitan di kecamatan Antapani menghasilkan klaster kata kunci lokal yang sangat relevan dan memiliki conversion intent tinggi.
+- [2026-09-14] Mengombinasikan merek populer furniture knockdown dengan layanan jasa rakit panggilan dan nama kecamatan spesifik Arcamanik sangat efektif menghasilkan keyword cluster berintent komersial tinggi.
+- [2026-09-15] Menargetkan variasi kombinasi nama brand populer furniture knockdown dengan kata kunci layanan panggilan terbukti efektif memperkuat intent komersial di area perkotaan besar.
+- [2026-09-15] Mengintegrasikan kata kunci kombinasi layanan bongkar-pasang pindahan dengan merek furniture spesifik di area Jabodetabek, Bandung, dan Surabaya terbukti memperkuat intent transaksi langsung.

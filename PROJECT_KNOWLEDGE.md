@@ -495,6 +495,33 @@ Conclusion: after correction, AI Studio's copy is functionally equal to `experim
 - Claude in this repo = app developer AND debugger. AI Studio = cloud host ONLY. It is not a developer and its edits are never merged back; the repo is the single source of truth and deploys flow one way, repo -> AI Studio.
 - Next: the user will propose the next update tomorrow. The cloud experiment stays open and UNVERIFIED until a `storage=gcs` startup log is seen.
 
+## Operator Feedback Round 3: slow orchestrator, endless audit loop, quota opacity (2026-09-15)
+Status: FIXED and VERIFIED live. Same campaign (cmp-001, placeholder area name): 111 s -> 36 s, revisions 2 -> 0, 7/7 stages done.
+
+The user reported the orchestrator was very slow, "kept auditing" because quality stayed low, and named two causes: some models "not found" (not quota), and the audit re-revising over a bad area name that the orchestrator cannot change. Both confirmed and fixed; several more causes found in the ledger.
+
+What the ledger showed (run 1, 111 s): every pro-first stage paid a 429 on `gemini-3.1-pro-preview` (limit 0) before falling back; the discovery-extended chain walked `gemini-2.5-flash`/`2.5-pro` which return 404 "no longer available to new users" (retired models, still listed by ListModels); one audit call took 49 s; two revision rounds (4 extra LLM calls) ran against a placeholder area name no rewrite could fix.
+
+Fixes (server.ts):
+1. Quota classification. `parseGeminiQuota()` reads the provider's 429 body (`RetryInfo.retryDelay`, `QuotaFailure.violations[].quotaId`, and "limit: 0" in the message) and classifies the hit as `minute` (cool for retryDelay+2 s, min 5 s), `day` (cool 1 h), or `none` = no free allowance at all (cool 24 h). Unit-tested against the real body from 2026-09-14 and three edge cases. `/api/gemini/status` exposes `quotaScope`/`retryAfterSeconds`; the status widget now says "limit per menit - coba lagi 23 dtk" / "limit harian habis" / "tanpa jatah gratis (limit 0)" instead of one opaque "quota exhausted 15m". This is the user's "two categories of limit" request.
+2. Slot state persisted to `data/model-slots.json` (write-through, 500 ms debounce; reloaded at boot, expired cooldowns dropped). Restarts -- constant in the AI Studio sandbox -- no longer re-walk dead models.
+3. Retired models are global. A 404 from ANY key adds the model to `RETIRED_MODELS` (persisted to `data/retired-models.json`, also seeded at boot from persisted MODEL_NOT_FOUND slots) and removes it from every feature's chain. Verified: `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-2.5-flash-lite` excluded on boot; chains now end with real 3.x models instead.
+4. Thinking effort. `thinkingConfig: { thinkingLevel: "low" }` is sent to text agents. Probe showed the parameter accepted by `gemini-3.6-flash` and `flash-lite-latest` while `thinkingBudget: 0` was REJECTED (400) by flash-lite -- so the hint is per-model resilient: a 400 adds the model to `THINKING_HINT_UNSUPPORTED` and the same slot is retried once without it, never counted as a failure. Observed: 0 rejections in live runs.
+5. Plan and strategy stages run concurrently (`Promise.allSettled`): different keys, no data dependency, saves the briefing's full latency every run.
+6. Transient handling. 503 "high demand" cooldown 5 min -> 45 s. If a chain is exhausted and any failure was 5xx, the router waits (soonest recovery, 8-50 s) and walks the chain once more instead of failing the stage -- one failed stage used to skip everything downstream. HTTP timeout 60 s per call so a hung call cannot stall a stage indefinitely.
+7. Self-improvement notes deduplicated on append (normalised text match or >=0.7 token overlap). Existing logs cleaned once (campaign-strategy 6 -> 4, image 8 -> 7, orchestrator 4 -> 3). Prompts were growing with repeated sentences.
+
+Audit hand-off (the user's design, implemented):
+- `AUDIT_SCHEMA` findings now carry `fixableBy: "ai" | "human"`, `field` (targetCities, address, phoneWhatsApp, businessName, category, description, productsServices, priceRange, website, other) and `suggestion`. `normaliseFinding()` guards against a missing/odd classification (required-data/location complaints default to human, with a field guess from the message).
+- `quality-audit.md` (live contract) gained the rule, and the audit prompt explains it -- including "never suggest inventing data for a human finding".
+- Orchestrator: while ANY human-required finding exists, the revision loop is skipped and a `handoff` ledger entry explains why. Rationale: the "ai" findings are almost always consequences of the "human" ones (a placeholder area name shows up in the title, keywords and address), so rewriting first burns two rounds for nothing. Revisions run only when the remaining findings are all AI-fixable.
+- Response carries `humanActionRequired[]`; blockers say "N temuan audit butuh input pemilik usaha".
+- OrchestratorPanel renders a "Perlu Input Anda" panel: one editor per flagged field (list fields comma-separated, description as textarea), the auditor's message + suggestion, "Simpan ke Campaign" and "Simpan & Jalankan Ulang" (updates the campaign, mirrors targetCities into seoStrategy, re-runs with the corrected data -- `handleRun` accepts an override so it does not race the prop update). Findings in the audit block are badged "PERLU ANDA" / "DIPERBAIKI AI".
+
+Verified live on cmp-001 (area = "[Nama Daerah Target]"): audit returned two `human` findings with fields `targetCities` and `address`; ledger shows `handoff`; `revisions: 0`; `humanActionRequired` = those two. Fourth run: 36 s, all 7 stages `done`, `fallbacksUsed: 1`.
+
+Caveat recorded honestly: run 2 and run 3 were SLOWER (155 s; then a pipeline collapse) because Google returned 503 "high demand" on `gemini-3.6-flash`, `flash-latest` and `2.5-flash` repeatedly during those minutes. Item 6 above came out of that. Wall-clock time remains partly at the provider's mercy; what is now under our control (dead models, pointless revisions, thinking effort, serial briefing) is fixed.
+
 ## Roadmap Completion Summary (2026-09-14)
 All four phases of the approved plan are implemented. Evidence status per phase:
 - Phase 1 MD contracts: PROVEN (sentinel twice, notes on disk, then real notes from a production siege run).

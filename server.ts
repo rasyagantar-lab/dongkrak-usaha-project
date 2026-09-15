@@ -124,7 +124,11 @@ function getGeminiAI(feature: FeatureName = "content") {
     httpOptions: {
       headers: {
         'User-Agent': 'aistudio-build'
-      }
+      },
+      // A single generation should never hang a whole pipeline stage. Under provider
+      // load a call was observed taking ~57 s before succeeding; anything beyond this
+      // is treated as a temporary failure and the chain moves on.
+      timeout: 60_000
     }
   });
 }
@@ -150,6 +154,110 @@ interface ModelSlotState {
   successCount: number;
   failureCount: number;
   lastUsedAt?: number;
+  // Filled on a 429 by parseGeminiQuota(): which allowance was hit. Lets the UI say
+  // "per-minute limit, retry in 23s" vs "daily limit" vs "no free allowance at all",
+  // instead of one opaque "quota exhausted 15m".
+  quotaScope?: QuotaScope;
+  retryAfterSeconds?: number;
+}
+
+// 'minute'  -> a per-minute RPM/TPM ceiling; recovers in seconds, cool down for retryDelay.
+// 'day'     -> the per-day project ceiling; nothing until the daily reset.
+// 'none'    -> provider reports "limit: 0": this key has NO free allowance for this
+//              model at all (the pro-preview / image-model case). Retrying is pointless
+//              for the rest of the day.
+type QuotaScope = 'minute' | 'day' | 'none' | 'unknown';
+
+interface QuotaDetail {
+  scope: QuotaScope;
+  retryAfterMs?: number;
+  limitZero: boolean;
+  metrics: string[];
+}
+
+// The Gemini SDK surfaces the provider's JSON error body inside err.message. Its
+// details[] carry a RetryInfo (retryDelay "23s") and a QuotaFailure whose quotaId
+// names the window ("...PerMinute..." / "...PerDay..."), and the message text says
+// "limit: 0" when the tier has no allowance. All of that is parsed defensively --
+// any missing piece degrades to 'unknown', never throws.
+function parseGeminiQuota(err: any): QuotaDetail {
+  const raw = String(err?.message || '');
+  let body: any = null;
+  try { body = JSON.parse(raw); } catch { /* not a JSON body; fall through to text heuristics */ }
+  const e = body?.error || body || {};
+  const text = String(e?.message || raw);
+  const details: any[] = Array.isArray(e?.details) ? e.details : [];
+
+  let retryAfterMs: number | undefined;
+  const retry = details.find(d => typeof d?.retryDelay === 'string');
+  if (retry) {
+    const m = String(retry.retryDelay).match(/([\d.]+)s/);
+    if (m) retryAfterMs = Math.ceil(parseFloat(m[1]) * 1000);
+  }
+
+  const quotaIds: string[] = [];
+  for (const d of details) {
+    for (const v of (Array.isArray(d?.violations) ? d.violations : [])) {
+      if (typeof v?.quotaId === 'string') quotaIds.push(v.quotaId);
+    }
+  }
+  const limitZero = /limit:\s*0\b/i.test(text);
+  const hasDay = quotaIds.some(q => /PerDay/i.test(q)) || /per day|daily/i.test(text);
+  const hasMinute = quotaIds.some(q => /PerMinute/i.test(q));
+
+  const scope: QuotaScope = limitZero ? 'none' : hasDay ? 'day' : hasMinute ? 'minute' : 'unknown';
+  const metrics = quotaIds.map(q => q.replace(/-FreeTier$/i, ''));
+  return { scope, retryAfterMs, limitZero, metrics };
+}
+
+function quotaCooldownMs(detail: QuotaDetail): number {
+  switch (detail.scope) {
+    case 'minute': return Math.max(5_000, (detail.retryAfterMs ?? 60_000) + 2_000);
+    case 'day': return 60 * 60 * 1000;         // re-probe hourly; the daily reset time is not exposed
+    case 'none': return 24 * 60 * 60 * 1000;   // structurally zero allowance -- stop hammering it
+    default: return COOLDOWN_MS.quota;
+  }
+}
+
+// Slot state used to be memory-only, so every restart (constant in the AI Studio
+// sandbox) forgot which models are dead and re-walked 404s and "limit: 0" 429s on the
+// first request. It is now written through to storage and reloaded at boot.
+const SLOT_STATE_KEY = 'data/model-slots.json';
+let slotPersistTimer: NodeJS.Timeout | null = null;
+function persistSlotState() {
+  if (slotPersistTimer) return;
+  slotPersistTimer = setTimeout(() => {
+    slotPersistTimer = null;
+    const snapshot = JSON.stringify([...MODEL_SLOT_STATE.values()]);
+    storage.writeText(SLOT_STATE_KEY, snapshot).catch(err => console.error('[AI Router] slot persist failed:', err));
+  }, 500);
+}
+async function loadSlotState(): Promise<void> {
+  try {
+    const text = await storage.readText(SLOT_STATE_KEY);
+    if (!text) return;
+    const parsed = JSON.parse(text);
+    if (!Array.isArray(parsed)) return;
+    const now = Date.now();
+    let kept = 0;
+    for (const slot of parsed) {
+      if (!slot?.keyFingerprint || !slot?.modelId) continue;
+      // Only cooldowns still in force are worth restoring; counters come along for the UI.
+      if (!slot.available && slot.unavailableUntil && slot.unavailableUntil < now) {
+        slot.available = true; slot.status = 'AVAILABLE'; slot.unavailableUntil = undefined;
+      }
+      MODEL_SLOT_STATE.set(`${slot.keyFingerprint}:${slot.modelId}`, slot);
+      kept++;
+      // A persisted 404 from any key is evidence the model is retired for everyone.
+      if (slot.status === 'MODEL_NOT_FOUND' && !slot.available && !RETIRED_MODELS.has(slot.modelId)) {
+        RETIRED_MODELS.add(slot.modelId);
+      }
+    }
+    if (RETIRED_MODELS.size) persistRetiredModels();
+    console.log(`[AI Router] restored ${kept} model slot states from storage.`);
+  } catch (err) {
+    console.error('[AI Router] could not restore slot state:', err);
+  }
 }
 
 const KNOWN_MODEL_NAMES: Record<string, string> = {
@@ -167,12 +275,34 @@ const MAX_CHAIN_LENGTH = 8;
 
 const COOLDOWN_MS = {
   quota: 15 * 60 * 1000,
-  temporary: 5 * 60 * 1000,
+  // 503 "high demand, spikes are usually temporary": measured storms last seconds to a
+  // couple of minutes. Five minutes here made whole chains look dead during a spike.
+  temporary: 45 * 1000,
   notFound: 24 * 60 * 60 * 1000,
   unknown: 2 * 60 * 1000
 };
 
 const MODEL_SLOT_STATE = new Map<string, ModelSlotState>();
+// Models that returned 400 when sent thinkingConfig. Learned at runtime, per process.
+const THINKING_HINT_UNSUPPORTED = new Set<string>();
+// Models the provider says are retired ("no longer available to new users", 404).
+// A 404 is a property of the MODEL, not of the key that hit it, so one sighting removes
+// the model from every feature's chain. Persisted alongside slot state.
+const RETIRED_MODELS = new Set<string>();
+const RETIRED_MODELS_KEY = 'data/retired-models.json';
+function persistRetiredModels() {
+  storage.writeText(RETIRED_MODELS_KEY, JSON.stringify([...RETIRED_MODELS])).catch(err => console.error('[AI Router] retired-models persist failed:', err));
+}
+async function loadRetiredModels(): Promise<void> {
+  try {
+    const text = await storage.readText(RETIRED_MODELS_KEY);
+    if (!text) return;
+    for (const id of JSON.parse(text)) if (typeof id === 'string') RETIRED_MODELS.add(id);
+    if (RETIRED_MODELS.size) console.log(`[AI Router] ${RETIRED_MODELS.size} retired model(s) excluded from all chains: ${[...RETIRED_MODELS].join(', ')}`);
+  } catch (err) {
+    console.error('[AI Router] could not restore retired models:', err);
+  }
+}
 
 // Short, one-way identifier so quota state and the status API can refer to a key
 // without ever storing or exposing the key itself. Identical key values produce
@@ -263,6 +393,8 @@ function refreshExpiredCooldowns(now = Date.now()) {
       slot.available = true;
       slot.status = 'AVAILABLE';
       slot.unavailableUntil = undefined;
+      slot.quotaScope = undefined;
+      slot.retryAfterSeconds = undefined;
       console.log(`[AI Router] key ${slot.keyFingerprint} model ${slot.modelId} cooldown finished; restored.`);
     }
   }
@@ -289,7 +421,7 @@ export interface GenerationAttempt {
   error?: string;
 }
 
-async function generateWithFallback(options: { feature?: FeatureName, contents: any, config: any }) {
+async function generateWithFallback(options: { feature?: FeatureName, contents: any, config: any, __waited?: boolean }) {
   const feature = options.feature ?? "content";
   const featureConfig = FEATURE_MODEL_REGISTRY[feature];
   const apiKey = getFeatureApiKey(feature);
@@ -314,13 +446,25 @@ async function generateWithFallback(options: { feature?: FeatureName, contents: 
   const extendedChain = [
     ...featureConfig.models,
     ...discovered.filter(id => !featureConfig.models.includes(id))
-  ].slice(0, MAX_CHAIN_LENGTH);
+  ].filter(id => !RETIRED_MODELS.has(id)).slice(0, MAX_CHAIN_LENGTH);
 
   const orderedSlots = extendedChain
     .map(modelId => getSlotState(keyFingerprint, modelId))
     .filter(slot => slot.available);
 
   if (orderedSlots.length === 0) {
+    // Everything is cooling. If the soonest to recover is only briefly unavailable
+    // (a 503 spike), wait for it once rather than failing the whole stage.
+    const soonest = extendedChain
+      .map(modelId => getSlotState(keyFingerprint, modelId))
+      .filter(slot => slot.status === 'TEMPORARILY_UNAVAILABLE' && slot.unavailableUntil)
+      .sort((a, b) => (a.unavailableUntil! - b.unavailableUntil!))[0];
+    const waitMs = soonest ? soonest.unavailableUntil! - Date.now() : Infinity;
+    if (!options.__waited && waitMs > 0 && waitMs <= 50_000) {
+      console.log(`[AI Router] feature=${feature}: all models cooling; waiting ${Math.ceil(waitMs / 1000)}s for ${soonest!.modelId} then retrying once.`);
+      await new Promise(r => setTimeout(r, waitMs + 500));
+      return generateWithFallback({ ...options, __waited: true });
+    }
     const cooling = extendedChain.map(modelId => {
       const slot = getSlotState(keyFingerprint, modelId);
       const secondsLeft = slot.unavailableUntil ? Math.max(0, Math.ceil((slot.unavailableUntil - now) / 1000)) : 0;
@@ -338,15 +482,35 @@ async function generateWithFallback(options: { feature?: FeatureName, contents: 
       if (slot.modelId !== primaryModelId) fallbackOccurred = true;
       console.log(`[AI Router] feature=${feature} key=${keyFingerprint} model=${slot.modelId}`);
 
-      const response = await ai.models.generateContent({
-        model: slot.modelId,
-        contents: options.contents,
-        config: options.config
-      });
+      // Low thinking effort: every agent here is a structured extraction/writing task
+      // whose rules arrive in the prompt (the contract), and default "thinking" on a
+      // long prompt was measured at ~49 s for one audit call vs ~2 s without. The
+      // parameter is not accepted by every model (a 400 was observed on
+      // flash-lite for thinkingBudget), so a rejection is remembered per model and
+      // the same slot is retried once without it -- never counted as a slot failure.
+      const wantsThinkingHint = featureConfig.modelKind === "text" && !THINKING_HINT_UNSUPPORTED.has(slot.modelId);
+      const configWithHint = wantsThinkingHint
+        ? { ...options.config, thinkingConfig: { thinkingLevel: "low" } }
+        : options.config;
+
+      let response;
+      try {
+        response = await ai.models.generateContent({ model: slot.modelId, contents: options.contents, config: configWithHint });
+      } catch (firstErr: any) {
+        const c = classifyProviderError(firstErr);
+        if (wantsThinkingHint && c.isInvalid) {
+          THINKING_HINT_UNSUPPORTED.add(slot.modelId);
+          console.warn(`[AI Router] model ${slot.modelId} rejected thinkingConfig; retrying without it (remembered).`);
+          response = await ai.models.generateContent({ model: slot.modelId, contents: options.contents, config: options.config });
+        } else {
+          throw firstErr;
+        }
+      }
 
       slot.successCount++;
       slot.lastUsedAt = Date.now();
       attempts.push({ model: slot.modelId, ok: true });
+      persistSlotState();
 
       return {
         modelUsed: slot.modelId,
@@ -371,11 +535,20 @@ async function generateWithFallback(options: { feature?: FeatureName, contents: 
 
       slot.available = false;
       if (classified.isQuota) {
+        const detail = parseGeminiQuota(err);
         slot.status = 'QUOTA_EXHAUSTED';
-        slot.unavailableUntil = Date.now() + COOLDOWN_MS.quota;
+        slot.quotaScope = detail.scope;
+        slot.retryAfterSeconds = detail.retryAfterMs ? Math.ceil(detail.retryAfterMs / 1000) : undefined;
+        slot.unavailableUntil = Date.now() + quotaCooldownMs(detail);
+        console.warn(`[AI Router] quota scope=${detail.scope} model=${slot.modelId} retryAfter=${slot.retryAfterSeconds ?? '-'}s metrics=${detail.metrics.join('|') || '-'}`);
       } else if (classified.isNotFound) {
         slot.status = 'MODEL_NOT_FOUND';
         slot.unavailableUntil = Date.now() + COOLDOWN_MS.notFound;
+        if (!RETIRED_MODELS.has(slot.modelId)) {
+          RETIRED_MODELS.add(slot.modelId);
+          persistRetiredModels();
+          console.warn(`[AI Router] model ${slot.modelId} is retired (404); excluded from every chain from now on.`);
+        }
       } else if (classified.isTemporary) {
         slot.status = 'TEMPORARILY_UNAVAILABLE';
         slot.unavailableUntil = Date.now() + COOLDOWN_MS.temporary;
@@ -383,7 +556,23 @@ async function generateWithFallback(options: { feature?: FeatureName, contents: 
         slot.status = 'ERROR';
         slot.unavailableUntil = Date.now() + COOLDOWN_MS.unknown;
       }
+      persistSlotState();
     }
+  }
+
+  // The whole chain failed in one pass. If any of those failures were transient
+  // (503 "high demand" spikes last seconds), waiting briefly and walking the chain
+  // once more is far cheaper than failing the stage and, with it, every stage after.
+  const sawTransient = attempts.some(a => !a.ok && a.status && a.status >= 500 && a.status < 600);
+  if (sawTransient && !options.__waited) {
+    const soonest = extendedChain
+      .map(modelId => getSlotState(keyFingerprint, modelId))
+      .filter(slot => slot.status === 'TEMPORARILY_UNAVAILABLE' && slot.unavailableUntil)
+      .sort((a, b) => (a.unavailableUntil! - b.unavailableUntil!))[0];
+    const waitMs = Math.min(50_000, Math.max(8_000, soonest ? soonest.unavailableUntil! - Date.now() : 20_000));
+    console.log(`[AI Router] feature=${feature}: chain exhausted by transient errors; waiting ${Math.ceil(waitMs / 1000)}s and retrying once.`);
+    await new Promise(r => setTimeout(r, waitMs + 500));
+    return generateWithFallback({ ...options, __waited: true });
   }
 
   throw new Error(`All models for feature ${feature} failed. Attempts: ${JSON.stringify(attempts)}`);
@@ -483,7 +672,7 @@ app.get("/api/gemini/status", async (req, res) => {
       const extendedChain = [
         ...config.models,
         ...discovered.filter(id => !config.models.includes(id))
-      ].slice(0, MAX_CHAIN_LENGTH);
+      ].filter(id => !RETIRED_MODELS.has(id)).slice(0, MAX_CHAIN_LENGTH);
 
       return {
         preferredModels: config.models,
@@ -514,6 +703,8 @@ app.get("/api/gemini/status", async (req, res) => {
             status: slot.status,
             available: slot.available,
             cooldownSecondsLeft: slot.unavailableUntil ? Math.max(0, Math.ceil((slot.unavailableUntil - now) / 1000)) : 0,
+            quotaScope: slot.quotaScope,
+            retryAfterSeconds: slot.retryAfterSeconds,
             successCount: slot.successCount,
             failureCount: slot.failureCount,
             lastErrorStatus: slot.lastErrorStatus,
@@ -879,6 +1070,24 @@ function appendSelfImprovementNote(contractFile: string, note: string): void {
       existingEntries = body.split("\n").map(l => l.trim()).filter(l => l.startsWith("- ["));
     }
 
+    // A note that merely restates an existing one adds nothing to the rulebook and
+    // bloats every future prompt. Skip near-duplicates (same normalised text, or a
+    // very high token overlap with an existing entry).
+    const normalise = (t: string) => t.replace(/^- \[[^\]]*\]\s*/, "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+    const tokens = (t: string) => new Set(normalise(t).split(" ").filter(w => w.length > 3));
+    const newNorm = normalise(newEntry);
+    const newTok = tokens(newEntry);
+    const isDuplicate = existingEntries.some(e => {
+      if (normalise(e) === newNorm) return true;
+      const et = tokens(e);
+      const inter = [...newTok].filter(w => et.has(w)).length;
+      const union = new Set([...newTok, ...et]).size || 1;
+      return inter / union >= 0.7;
+    });
+    if (isDuplicate) {
+      console.log(`[Agent Contract] ${contractFile}: self-improvement note skipped (duplicate of an existing entry).`);
+      return;
+    }
     const capped = [...existingEntries, newEntry].slice(-MAX_SELF_IMPROVEMENT_ENTRIES);
     const updated = `${head}${capped.join("\n")}\n${tail ? "\n" + tail : ""}`;
     if (storage.STORAGE_MODE === "gcs") {
@@ -1104,15 +1313,61 @@ const AUDIT_SCHEMA = {
         properties: {
           type: { type: Type.STRING },
           category: { type: Type.STRING },
-          message: { type: Type.STRING }
+          message: { type: Type.STRING },
+          // Who can act on this finding. "ai": the content agent can fix it by
+          // rewriting. "human": it needs the business owner to change or supply data
+          // (wrong/unclear area name, missing WhatsApp, missing address...). The
+          // orchestrator only re-commissions rewrites for "ai" findings; "human"
+          // findings are handed to the operator as editable fields instead of being
+          // looped on pointlessly.
+          fixableBy: { type: Type.STRING },
+          field: { type: Type.STRING },
+          suggestion: { type: Type.STRING }
         },
-        required: ["type", "category", "message"]
+        required: ["type", "category", "message", "fixableBy"]
       }
     },
     selfImprovementNote: { type: Type.STRING }
   },
   required: ["seoScore", "contentQuality", "localRelevance", "publishingReadiness", "findings"]
 };
+
+// Campaign fields a human may be asked to correct. Kept as a closed list so the UI
+// can render the right editor and the audit cannot name a field that does not exist.
+const HUMAN_FIXABLE_FIELDS = ["targetCities", "address", "phoneWhatsApp", "businessName", "category", "description", "productsServices", "priceRange", "website", "other"] as const;
+type HumanFixableField = typeof HUMAN_FIXABLE_FIELDS[number];
+
+interface AuditFinding {
+  type: "pass" | "warning" | "error";
+  category: string;
+  message: string;
+  fixableBy?: "ai" | "human";
+  field?: HumanFixableField;
+  suggestion?: string;
+}
+
+// The model is asked to classify, but a missing/odd value must not break the loop.
+// Findings about required data or location default to human; everything else to ai.
+function normaliseFinding(f: any): AuditFinding {
+  const type = (["pass", "warning", "error"].includes(f?.type) ? f.type : "warning") as AuditFinding["type"];
+  const category = String(f?.category || "Required Fields");
+  let fixableBy: "ai" | "human" = f?.fixableBy === "human" ? "human" : f?.fixableBy === "ai" ? "ai"
+    : /required|location|contact|address|alamat|kontak|lokasi|daerah/i.test(category + " " + String(f?.message || "")) ? "human" : "ai";
+  const field = HUMAN_FIXABLE_FIELDS.includes(f?.field) ? f.field : undefined;
+  if (fixableBy === "human" && !field) {
+    // Best-effort field guess so the UI can still open an editor.
+    const m = String(f?.message || "").toLowerCase();
+    const guessed: HumanFixableField =
+      /whatsapp|telepon|phone|kontak|nomor/.test(m) ? "phoneWhatsApp"
+      : /alamat|address/.test(m) ? "address"
+      : /daerah|kota|lokasi|wilayah|area|kecamatan|city|location|placeholder/.test(m) ? "targetCities"
+      : /harga|price/.test(m) ? "priceRange"
+      : /nama bisnis|business name/.test(m) ? "businessName"
+      : "other";
+    return { type, category, message: String(f?.message || ""), fixableBy, field: guessed, suggestion: f?.suggestion ? String(f.suggestion) : undefined };
+  }
+  return { type, category, message: String(f?.message || ""), fixableBy, field, suggestion: f?.suggestion ? String(f.suggestion) : undefined };
+}
 
 function runAuditAgent(campaign: any) {
   const prompt = `Evaluasi Kualitas SEO dan Kesiapan Publishing untuk listing DongkrakUsaha berikut:
@@ -1133,7 +1388,19 @@ Jalankan evaluasi komprehensif:
 4. Missing Required Business Info check
 5. Quality Scores (0-100)
 
-publishingReadiness harus salah satu dari: READY, WARNINGS, BLOCKED.`;
+publishingReadiness harus salah satu dari: READY, WARNINGS, BLOCKED.
+
+KLASIFIKASI SETIAP TEMUAN (field "fixableBy") -- ini menentukan apa yang terjadi berikutnya:
+- "ai"    : bisa diperbaiki Content Agent dengan MENULIS ULANG teks (keyword stuffing, nada,
+            struktur, CTA lemah, panjang, duplikasi, kalimat kurang lokal).
+- "human" : TIDAK bisa diperbaiki dengan menulis ulang karena DATA-nya yang bermasalah dan hanya
+            pemilik usaha yang boleh mengubahnya: nomor WhatsApp kosong/tidak valid, alamat kosong,
+            nama daerah target kosong / bukan nama tempat nyata / masih placeholder seperti
+            "[Nama Daerah Target]", nama bisnis tidak jelas, harga tidak masuk akal.
+Untuk temuan "human", isi "field" dengan salah satu dari: targetCities, address, phoneWhatsApp,
+businessName, category, description, productsServices, priceRange, website, other -- dan isi
+"suggestion" dengan satu kalimat apa yang harus diubah pemilik usaha.
+Jangan pernah menyarankan mengarang data untuk temuan "human".`;
 
   return runAgent("audit", prompt, AUDIT_SCHEMA);
 }
@@ -1896,7 +2163,7 @@ app.post("/api/orchestrator/package", (req, res) => {
 
 // The fixed pipeline stages, plus the dynamically numbered revision/re-audit stages
 // the orchestrator adds when the auditor rejects a draft (e.g. `content-revisi-1`).
-type StageName = 'plan' | 'strategy' | 'keyword' | 'content' | 'audit' | 'image' | `content-revisi-${number}` | `audit-ulang-${number}`;
+type StageName = 'plan' | 'strategy' | 'keyword' | 'content' | 'audit' | 'image' | 'handoff' | `content-revisi-${number}` | `audit-ulang-${number}`;
 
 interface LedgerEntry {
   order: number;
@@ -1991,33 +2258,35 @@ app.post("/api/orchestrator/run", async (req, res) => {
   // Turns a thrown provider/config error into a short, user-actionable reason.
   const explain = (err: any) => String(err?.message || 'Unknown error').slice(0, 400);
 
-  // Stage 0: orchestrator briefing (advisory, non-fatal)
+  // Stage 0 + Stage 1 run concurrently. The briefing is advisory and feeds nothing
+  // downstream; strategy is the first real dependency. They use different keys, so
+  // running them together costs no extra quota on either and saves the briefing's
+  // full latency (~8 s measured) from every run.
   {
     const t0 = Date.now();
-    try {
-      const { result, meta } = await runOrchestratorPlan(businessData, objective);
+    const [planRes, strategyRes] = await Promise.allSettled([
+      runOrchestratorPlan(businessData, objective),
+      runStrategyAgent(businessData, objective)
+    ]);
+    if (planRes.status === 'fulfilled') {
+      const { result, meta } = planRes.value;
       outputs.plan = result;
       record('plan', 'Orchestrator', 'orchestrator', 'done', t0, {
         modelUsed: meta.modelUsed, modelName: meta.modelName,
         fallbackOccurred: meta.fallbackOccurred, keyFingerprint: meta.keyFingerprint, attempts: meta.attempts
       });
-    } catch (err: any) {
-      record('plan', 'Orchestrator', 'orchestrator', 'failed', t0, { reason: explain(err) });
+    } else {
+      record('plan', 'Orchestrator', 'orchestrator', 'failed', t0, { reason: explain(planRes.reason) });
     }
-  }
-
-  // Stage 1: campaign strategy (independent)
-  {
-    const t0 = Date.now();
-    try {
-      const { result, meta } = await runStrategyAgent(businessData, objective);
+    if (strategyRes.status === 'fulfilled') {
+      const { result, meta } = strategyRes.value;
       outputs.strategy = result;
       record('strategy', 'Campaign Strategy', 'strategy', 'done', t0, {
         modelUsed: meta.modelUsed, modelName: meta.modelName,
         fallbackOccurred: meta.fallbackOccurred, keyFingerprint: meta.keyFingerprint, attempts: meta.attempts
       });
-    } catch (err: any) {
-      record('strategy', 'Campaign Strategy', 'strategy', 'failed', t0, { reason: explain(err) });
+    } else {
+      record('strategy', 'Campaign Strategy', 'strategy', 'failed', t0, { reason: explain(strategyRes.reason) });
     }
   }
 
@@ -2086,10 +2355,43 @@ app.post("/api/orchestrator/run", async (req, res) => {
   // happily hand over content its own auditor had just rejected.
   const MAX_REVISIONS = 2;
   let revisionRound = 0;
+  const findingsOf = (audit: any): AuditFinding[] => (Array.isArray(audit?.findings) ? audit.findings.map(normaliseFinding) : []);
+  const actionable = (audit: any) => findingsOf(audit).filter(f => f.type !== 'pass');
+  const aiFixableOf = (audit: any) => actionable(audit).filter(f => f.fixableBy === 'ai');
+  const humanRequiredOf = (audit: any) => actionable(audit).filter(f => f.fixableBy === 'human');
+
+  // Normalise the audit output once so the UI and the loop see the same shape.
+  if (outputs.audit && Array.isArray(outputs.audit.findings)) outputs.audit.findings = findingsOf(outputs.audit);
+
+  // Hand-off instead of a pointless loop: if the auditor's complaints are all about
+  // DATA only the owner can change (wrong area name, missing WhatsApp), no amount of
+  // rewriting will satisfy it. Skip the revision rounds and surface the fields.
+  if (outputs.audit && outputs.generatedContent &&
+      ['WARNINGS', 'BLOCKED'].includes(String(outputs.audit.publishingReadiness || '').toUpperCase()) &&
+      aiFixableOf(outputs.audit).length === 0 && humanRequiredOf(outputs.audit).length > 0) {
+    record('handoff', 'Orchestrator Hand-off', 'orchestrator', 'done', Date.now(), {
+      reason: `Audit: ${humanRequiredOf(outputs.audit).length} temuan hanya bisa diperbaiki pemilik usaha (${[...new Set(humanRequiredOf(outputs.audit).map(f => f.field))].join(', ')}). Revisi AI dilewati -- tidak ada yang bisa diperbaiki dengan menulis ulang.`
+    });
+  }
+
+  // Hand-off comes FIRST. Copy problems the auditor labels "ai" are almost always a
+  // consequence of the data problems it labels "human" (a placeholder area name
+  // shows up in the title, the keywords, the address...). Rewriting on top of bad
+  // data burns two rounds of quota and changes nothing the owner will keep. So while
+  // any human-required finding exists, revisions are deferred until the owner has
+  // corrected the data and re-run.
+  if (outputs.audit && humanRequiredOf(outputs.audit).length > 0 && aiFixableOf(outputs.audit).length > 0) {
+    record('handoff', 'Orchestrator Hand-off', 'orchestrator', 'done', Date.now(), {
+      reason: `Audit: ${humanRequiredOf(outputs.audit).length} temuan butuh pemilik usaha (${[...new Set(humanRequiredOf(outputs.audit).map(f => f.field))].join(', ')}); ${aiFixableOf(outputs.audit).length} temuan tulisan ditunda sampai data diperbaiki -- merevisi di atas data yang salah hanya membuang kuota.`
+    });
+  }
+
   while (
     outputs.audit &&
     outputs.generatedContent &&
     ['WARNINGS', 'BLOCKED'].includes(String(outputs.audit.publishingReadiness || '').toUpperCase()) &&
+    aiFixableOf(outputs.audit).length > 0 &&
+    humanRequiredOf(outputs.audit).length === 0 &&
     revisionRound < MAX_REVISIONS
   ) {
     revisionRound++;
@@ -2127,6 +2429,7 @@ app.post("/api/orchestrator/run", async (req, res) => {
 
       // Only keep the rewrite if the auditor actually rates it better. A revision that
       // scores worse is discarded, so the loop cannot degrade a draft.
+      if (Array.isArray(reaudit?.findings)) reaudit.findings = findingsOf(reaudit);
       const scoreAfter = Number(reaudit.seoScore) || 0;
       const improved = scoreAfter >= scoreBefore;
       if (improved) {
@@ -2186,12 +2489,18 @@ app.post("/api/orchestrator/run", async (req, res) => {
   if (!outputs.generatedContent) blockers.push('Konten belum dihasilkan.');
   if (!outputs.audit) blockers.push('Audit kualitas belum dijalankan.');
   if (auditStatus === 'BLOCKED') blockers.push('Audit kualitas menandai status BLOCKED.');
-  if (auditStatus === 'WARNINGS') {
-    blockers.push(
-      revisionHistory.length > 0
-        ? `Audit masih WARNINGS setelah ${revisionHistory.length} kali revisi otomatis; sisa temuan perlu ditinjau manual.`
-        : 'Audit kualitas menghasilkan WARNINGS yang perlu ditinjau.'
-    );
+  const humanActionRequired = outputs.audit ? humanRequiredOf(outputs.audit) : [];
+  if (auditStatus === 'WARNINGS' || auditStatus === 'BLOCKED') {
+    if (humanActionRequired.length > 0) {
+      blockers.push(`${humanActionRequired.length} temuan audit butuh input pemilik usaha (lihat "Perlu Input Anda").`);
+    }
+    if (auditStatus === 'WARNINGS' && humanActionRequired.length === 0) {
+      blockers.push(
+        revisionHistory.length > 0
+          ? `Audit masih WARNINGS setelah ${revisionHistory.length} kali revisi otomatis; sisa temuan perlu ditinjau manual.`
+          : 'Audit kualitas menghasilkan WARNINGS yang perlu ditinjau.'
+      );
+    }
   }
   blockers.push('Gambar listing dibuat di tab Visual Aset (foto asli + caption), bukan oleh stage ini.');
 
@@ -2209,6 +2518,7 @@ app.post("/api/orchestrator/run", async (req, res) => {
     ledger,
     outputs,
     revisionHistory,
+    humanActionRequired,
     summary: {
       total: ledger.length,
       done: ledger.filter(e => e.status === 'done').length,
@@ -2383,6 +2693,8 @@ async function startServer() {
   await loadCampaigns();
   await OfficialDongkrakUsahaAdapter.loadHistory();
   await primeContractCache();
+  await loadSlotState();
+  await loadRetiredModels();
 
   // Startup summary: storage mode and which provider slots are configured -- NAMES
   // only, never values. This is the first thing to read in Cloud Run logs when an
