@@ -583,6 +583,13 @@ User requests: macOS-like smooth animation that stays light on low-end devices; 
 
 Verified: build clean; screenshots at both widths reviewed (splash, orchestrator, publish); nav bottom edge == viewport bottom; `scrollWidth == viewport width` at 400 px; 0 "Phase 1" strings visible in the Publish tab; splash suppressed on reload within the session.
 
+## Re-verified: Agents Read Their MD Contracts Live (2026-09-15, after today's server changes)
+Status: PROVEN again, same sentinel method as 2026-09-14, on the current  (post quota/retired-model/progress changes).
+- Inserted a temporary rule into  ("first word of positioning MUST be ZEBRA-7741"), called  WITHOUT restarting the server: response  began with  (model ).
+- Changed the marker to KOALA-2026 on disk, called again, still no restart: response began with , ZEBRA gone. So the contract is read fresh on every call, not cached at boot.
+- Contract restored from backup; no sentinel text remains in the repo.
+- Self-improvement writes also confirmed today as a side effect of the Step E test runs: 12 new dated lines landed across campaign-strategy / keyword-strategy / orchestrator / quality-audit (dedupe kept it to 12 across 4 runs).
+
 ## Roadmap Completion Summary (2026-09-14)
 All four phases of the approved plan are implemented. Evidence status per phase:
 - Phase 1 MD contracts: PROVEN (sentinel twice, notes on disk, then real notes from a production siege run).
