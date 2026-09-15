@@ -315,6 +315,58 @@ if (document.readyState === 'loading') {
 }
 
 // 1. Listen for background service worker broadcasts
+function clickInputProdukButton() {
+  const isVisible = (el) => {
+    if (!el) return false;
+    const style = window.getComputedStyle(el);
+    if (style.display === 'none' || style.visibility === 'hidden') return false;
+    const rect = el.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  };
+  const labelOf = (el) => (
+    (el.tagName === 'INPUT' ? (el.value || '') : (el.innerText || el.textContent || '')) ||
+    el.title || el.getAttribute('aria-label') || ''
+  ).replace(/\s+/g, ' ').trim();
+
+  const candidates = Array.from(document.querySelectorAll('a, button, input[type="button"], input[type="submit"], [role="button"], .btn'));
+  const exact = /^\+?\s*(input|tambah|add)\s+produk\s*(baru)?$/i;
+  const loose = /(input|tambah|add)\s*produk/i;
+  const hrefHint = /aksi=(tambah|input|add)|menu=produk.*(tambah|input|add)/i;
+
+  const scored = [];
+  for (const el of candidates) {
+    if (!isVisible(el)) continue;
+    const text = labelOf(el);
+    const href = el.tagName === 'A' ? (el.getAttribute('href') || '') : '';
+    let score = 0;
+    if (exact.test(text)) score = 3;
+    else if (loose.test(text)) score = 2;
+    else if (hrefHint.test(href)) score = 1;
+    if (score > 0) scored.push({ el, text, href, score });
+  }
+  scored.sort((a, b) => b.score - a.score);
+
+  const sample = candidates.filter(isVisible).slice(0, 40).map(labelOf).filter(Boolean).slice(0, 15);
+  if (scored.length === 0) {
+    return {
+      success: false,
+      error: 'INPUT_PRODUK_BUTTON_NOT_FOUND',
+      pageUrl: location.href,
+      visibleButtons: sample
+    };
+  }
+  const best = scored[0];
+  best.el.scrollIntoView({ block: 'center' });
+  best.el.click();
+  return {
+    success: true,
+    matchedText: best.text,
+    href: (() => { try { return best.href ? new URL(best.href, location.href).href : ''; } catch (e) { return best.href; } })(),
+    tag: best.el.tagName.toLowerCase(),
+    pageUrl: location.href
+  };
+}
+
 if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'PING') {
@@ -322,6 +374,18 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
       // script is already alive in this tab BEFORE deciding to re-inject content.js.
       // Answered synchronously — no need to keep the message channel open.
       sendResponse({ alive: true, bridgeInstanceId: currentBridgeInstanceId });
+      return false;
+    }
+    if (request.action === 'CLICK_INPUT_PRODUK') {
+      // The product LIST page (menu=produk) has an "Input Produk" button that opens the
+      // real entry form. The app used to open the list and leave the operator to find
+      // it. This locates the button by its visible text and clicks it. Answered
+      // synchronously; if the click navigates, background.js waits for the load.
+      let result;
+      try { result = clickInputProdukButton(); }
+      catch (err) { result = { success: false, error: 'CLICK_THREW', detail: err && err.message }; }
+      console.log('[DONGKRAK EXT CS] CLICK_INPUT_PRODUK ->', result);
+      sendResponse(result);
       return false;
     }
     if (request.action === 'INSPECT_PAGE_DOM') {
@@ -582,6 +646,23 @@ const handleWindowMessage = (event) => {
   if (event.data.type === 'DONGKRAK_REAL_EXT_OPEN_FORM') {
     if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
       chrome.runtime.sendMessage({ action: 'OPEN_DONGKRAK_PRODUCT_FORM' });
+    }
+  }
+
+  if (event.data.type === 'DONGKRAK_REAL_EXT_OPEN_INPUT_PRODUK') {
+    const requestId = event.data.requestId || ('input-produk-' + Date.now());
+    const reply = (payload) => window.postMessage({ type: 'DONGKRAK_INPUT_PRODUK_RESULT', requestId, payload }, '*');
+    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+      try {
+        chrome.runtime.sendMessage({ action: 'OPEN_DONGKRAK_INPUT_PRODUK', requestId }, (response) => {
+          if (chrome.runtime.lastError) { reply({ success: false, error: chrome.runtime.lastError.message || 'RUNTIME_MESSAGE_FAILED' }); return; }
+          reply(response || { success: false, error: 'EMPTY_EXTENSION_RESPONSE' });
+        });
+      } catch (e) {
+        reply({ success: false, error: e && e.message ? e.message : 'RUNTIME_MESSAGE_THREW' });
+      }
+    } else {
+      reply({ success: false, error: 'EXTENSION_NOT_AVAILABLE' });
     }
   }
 

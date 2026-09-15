@@ -173,3 +173,6 @@ caption compositing are local Sharp operations, not agent prompts):
 
 ## Improvement Rule
 Every completed task in Phase 2 must update this file with what worked, what failed, and what should be improved before moving to the next phase.
+
+## Publish Tab: Direct "Input Produk" (2026-09-15)
+- The extension can now press DongkrakUsaha's own "Input Produk" button (list page -> entry form) on request; see PROJECT_KNOWLEDGE.md "One Click To DongkrakUsaha's Input Produk Form". Finder verified on synthetic DOM; real-site verification pending the operator's login. The landed URL, once observed, should be recorded as the proven form URL.

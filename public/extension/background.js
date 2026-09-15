@@ -497,6 +497,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request.action === 'OPEN_DONGKRAK_INPUT_PRODUK') {
+    openInputProduk(requestId).then(sendResponse).catch((err) => {
+      sendResponse({ success: false, error: err && err.message ? err.message : 'OPEN_INPUT_PRODUK_FAILED' });
+    });
+    return true;
+  }
+
   if (request.action === 'OPEN_DONGKRAK_PRODUCT_FORM') {
     chrome.tabs.create({ url: "https://dongkrakusaha.com/panelMember/index.php?menu=produk" }, (tab) => {
       sendResponse({ success: true, tabId: tab.id });
@@ -546,6 +553,71 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 });
+
+// ---- "Input Produk" one-click ----
+// Opens (or re-uses) the member product LIST tab, waits for it to load, and asks the
+// content script there to click the "Input Produk" button. The list page is the only
+// URL we know for certain; the entry form is reached exactly the way a human does it.
+const PRODUK_LIST_URL = 'https://dongkrakusaha.com/panelMember/index.php?menu=produk';
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function waitForTabComplete(tabId, timeoutMs) {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (how) => { if (done) return; done = true; chrome.tabs.onUpdated.removeListener(listener); resolve(how); };
+    const listener = (updatedTabId, changeInfo) => {
+      if (updatedTabId === tabId && changeInfo.status === 'complete') finish('complete');
+    };
+    chrome.tabs.onUpdated.addListener(listener);
+    setTimeout(() => finish('timeout'), timeoutMs);
+  });
+}
+
+function sendToTab(tabId, message) {
+  return new Promise((resolve) => {
+    try {
+      chrome.tabs.sendMessage(tabId, message, { frameId: 0 }, (response) => {
+        if (chrome.runtime.lastError) { resolve(null); return; }
+        resolve(response || null);
+      });
+    } catch (e) { resolve(null); }
+  });
+}
+
+async function openInputProduk(requestId) {
+  const tabs = await new Promise((resolve) => chrome.tabs.query({}, resolve));
+  const dongkrakTabs = (tabs || []).filter((tab) => `${tab.url || ''} ${tab.pendingUrl || ''}`.toLowerCase().includes('dongkrakusaha.com'));
+  const existing = dongkrakTabs.find((t) => `${t.url || ''}`.toLowerCase().includes('menu=produk')) ||
+    dongkrakTabs.find((t) => `${t.url || ''}`.toLowerCase().includes('/panelmember')) ||
+    dongkrakTabs[0];
+
+  let tabId;
+  const loaded = existing
+    ? (async () => { const p = waitForTabComplete(existing.id, 20000); await chrome.tabs.update(existing.id, { url: PRODUK_LIST_URL, active: true }); tabId = existing.id; return p; })()
+    : (async () => { const tab = await chrome.tabs.create({ url: PRODUK_LIST_URL, active: true }); tabId = tab.id; return waitForTabComplete(tab.id, 20000); })();
+  const loadState = await loaded;
+  console.log('[DONGKRAK EXT BG] input-produk: list tab', tabId, 'load:', loadState, 'req:', requestId);
+  await sleep(500);
+
+  // The content script may need a moment after 'complete'; retry a few times.
+  let result = null;
+  for (let attempt = 1; attempt <= 5 && !result; attempt++) {
+    result = await sendToTab(tabId, { action: 'CLICK_INPUT_PRODUK', requestId });
+    if (!result) await sleep(600);
+  }
+  if (!result) return { success: false, error: 'CONTENT_SCRIPT_NOT_RESPONDING', tabId, reusedTab: !!existing };
+
+  if (result.success) {
+    // If the click navigates to the form, let it settle, then refresh the app's view
+    // of the DOM so the field list shows the entry form right away.
+    const after = await waitForTabComplete(tabId, 8000);
+    setTimeout(() => inspectAndSyncState('input-produk-' + Date.now(), null, 'INPUT_PRODUK'), 600);
+    const tab = await new Promise((resolve) => chrome.tabs.get(tabId, resolve));
+    return { ...result, tabId, reusedTab: !!existing, navigated: after === 'complete', landedUrl: tab && tab.url };
+  }
+  return { ...result, tabId, reusedTab: !!existing };
+}
 
 // Initial inspection trigger on worker boot
 inspectAndSyncState('init-' + Date.now(), null, 'WORKER_BOOT');

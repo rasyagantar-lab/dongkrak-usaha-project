@@ -554,6 +554,22 @@ Verified end-to-end (Playwright, headless): start run on cmp-001 -> switch to Da
 
 Not moved to the Job Center (deliberately): the publishing hub's extension autopost. Its submit-result listener already lives at the App root (see "Autopost Publish Finalization Listener" bug), and the hub now stays mounted anyway.
 
+## Feature - One Click To DongkrakUsaha's "Input Produk" Form (2026-09-15)
+Status: FIXED BUT UNVERIFIED on the real site (needs the operator's logged-in session). Finder logic PROVEN on synthetic pages.
+
+User report: "Buka halaman input produk" in the Publish tab lands on the product LIST, not the entry form; asked for a feature that presses DongkrakUsaha's own "Input Produk" button.
+
+We do not know the entry form's URL (only the list URL `panelMember/index.php?menu=produk` is proven), so the extension reaches the form the way a human does:
+- `content.js` (dongkrak page): new `CLICK_INPUT_PRODUK` action -> `clickInputProdukButton()` scans visible `a / button / input[type=button|submit] / [role=button] / .btn`, scores by visible text (exact "Input Produk" / "Tambah Produk" / "Add Produk" > loose match > href hint `aksi=tambah|input|add`), skips hidden elements, clicks the best, and returns `{matchedText, href, tag}` -- or `INPUT_PRODUK_BUTTON_NOT_FOUND` with the first 15 visible button labels so a miss is diagnosable from the app.
+- `background.js`: `OPEN_DONGKRAK_INPUT_PRODUK` re-uses an existing dongkrakusaha tab (navigates it to the list) or opens one, waits for `status: complete`, sends the click with up to 5 retries (content script settle), waits for the resulting navigation, then triggers the normal inspection so the app's field list refreshes on the form.
+- `content.js` (app page): `DONGKRAK_REAL_EXT_OPEN_INPUT_PRODUK` -> background -> `DONGKRAK_INPUT_PRODUK_RESULT` posted back with the payload.
+- `PublishingHub.tsx`: "Buka Form Input Produk (klik otomatis)" is now the primary button in all three places (authenticated banner, "no form detected" box, manual-assist link); the old list-only open is kept as a secondary "Hanya buka daftar produk". A status line shows the outcome (button text matched + landed URL, or the not-found diagnosis, or a 30 s timeout).
+- Extension manifest version 1.0.0 -> 1.1.0 so Chrome shows the update; the zip is rebuilt at boot (85 KB).
+
+Verified: content/background pass `node --check`; `tsc` clean; the finder run in headless Chromium against a synthetic list page (visible "+ Input Produk" link, a hidden duplicate, a "PRODUK" nav link, Share/Duplicate/Edit/Hapus buttons) picked the visible link and clicked it (navigation attempted); on a synthetic login page it returned NOT_FOUND with `visibleButtons: ["Login"]`.
+
+To verify on the real site (operator): reinstall/reload the extension from the new zip, log in to DongkrakUsaha, press the button in the Publish tab. Expected: the list tab opens, the form opens, the status line names the matched button and the landed URL -- record that URL here; it becomes the proven direct link. If it reports NOT_FOUND, the listed visible buttons tell us what the real label is.
+
 ## Roadmap Completion Summary (2026-09-14)
 All four phases of the approved plan are implemented. Evidence status per phase:
 - Phase 1 MD contracts: PROVEN (sentinel twice, notes on disk, then real notes from a production siege run).
