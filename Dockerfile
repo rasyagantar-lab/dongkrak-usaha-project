@@ -30,6 +30,9 @@ COPY --from=build /app/dist ./dist
 # (zipped on startup for the download button).
 COPY ai-agents ./ai-agents
 COPY public/extension ./public/extension
+# Bundled caption font: captions are rendered as vector paths from this file, so the
+# image needs no system fonts at all.
+COPY server/fonts ./server/fonts
 # Cloud Run injects PORT; the server reads it (defaults to 3000 locally).
 EXPOSE 8080
 CMD ["node", "dist/server.cjs"]

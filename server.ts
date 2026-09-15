@@ -9,6 +9,10 @@ import sharp from "sharp";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import { InferenceClient } from "@huggingface/inference";
+import * as opentypeNs from "opentype.js";
+// opentype.js is a CommonJS module. tsx (ESM dev mode) surfaces its exports under
+// .default while the esbuild CJS bundle surfaces them at the top level; resolve once.
+const opentype: typeof opentypeNs = ((opentypeNs as any).parse ? opentypeNs : (opentypeNs as any).default) as typeof opentypeNs;
 import { 
   OfficialDongkrakUsahaAdapter, 
   PublishResult 
@@ -1676,22 +1680,86 @@ function escapeXml(value: string): string {
     .replace(/'/g, "&apos;");
 }
 
+// ---- Caption text as vector paths ----
+// The caption used to be <text font-family="Segoe UI, Arial, sans-serif">. On a Linux
+// container with no fonts installed (AI Studio, Cloud Run) librsvg has nothing to draw
+// with and renders every glyph as a box -- the operator saw exactly that. So the text
+// is now converted to <path> outlines with a font bundled in the repo (Inter, SIL OFL,
+// server/fonts). No system font is consulted at any point; output is byte-identical on
+// every machine.
+//
+// Shaping is intentionally per-glyph (char -> glyph, advance width, pair kerning) and
+// bypasses opentype.js's GSUB pipeline, which throws on Inter's contextual lookups.
+// Indonesian is Latin script with no required shaping, so this loses nothing.
+const CAPTION_FONTS_DIR = path.join(process.cwd(), "server", "fonts");
+function loadCaptionFont(file: string): opentype.Font | null {
+  try {
+    const buf = fs.readFileSync(path.join(CAPTION_FONTS_DIR, file));
+    return opentype.parse(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+  } catch (err) {
+    console.error(`[Caption] could not load font ${file}; captions will fall back to system text:`, err);
+    return null;
+  }
+}
+const CAPTION_FONT_REGULAR = loadCaptionFont("Inter-Regular.woff");
+const CAPTION_FONT_BOLD = loadCaptionFont("Inter-Bold.woff");
+
+function textToPath(font: opentype.Font, text: string, x: number, y: number, size: number): { d: string; width: number } {
+  const scale = size / font.unitsPerEm;
+  let cx = x;
+  let d = "";
+  let prev: opentype.Glyph | null = null;
+  for (const ch of text) {
+    const g = font.charToGlyph(ch);
+    if (prev && g) cx += font.getKerningValue(prev, g) * scale;
+    if (g && g.path) {
+      const p = g.getPath(cx, y, size).toPathData(2);
+      if (p) d += p + " ";
+    }
+    cx += (g && g.advanceWidth != null ? g.advanceWidth : font.unitsPerEm * 0.5) * scale;
+    prev = g;
+  }
+  return { d: d.trim(), width: cx - x };
+}
+
+// Emits a vector <path> when the bundled font loaded, else a <text> element as a last
+// resort (works only where a system font exists, i.e. the developer's Windows box).
+function captionText(font: opentype.Font | null, text: string, x: number, y: number, size: number, fill: string, weight: 400 | 700): { svg: string; width: number } {
+  if (font) {
+    const { d, width } = textToPath(font, text, x, y, size);
+    return { svg: `<path d="${d}" fill="${fill}"/>`, width };
+  }
+  return {
+    svg: `<text x="${x}" y="${y}" font-family="Segoe UI, Arial, sans-serif" font-size="${size}" font-weight="${weight}" fill="${fill}">${escapeXml(text)}</text>`,
+    width: text.length * size * 0.55
+  };
+}
+
 function buildCaptionSvg(width: number, height: number, title: string, subtitle: string, badge?: string): Buffer {
   const barH = Math.round(height * 0.18);
   const padX = Math.round(width * 0.06);
   const titleSize = Math.round(height * 0.058);
   const subtitleSize = Math.round(height * 0.036);
+  const badgeSize = Math.round(height * 0.032);
 
-  const badgeBlock = badge
-    ? `<g>
-         <rect x="${padX}" y="${Math.round(height * 0.05)}" rx="${Math.round(height * 0.012)}"
-               width="${Math.min(width - padX * 2, badge.length * titleSize * 0.62 + padX)}"
-               height="${Math.round(height * 0.062)}" fill="#dc2626"/>
-         <text x="${padX + Math.round(height * 0.018)}" y="${Math.round(height * 0.05 + height * 0.045)}"
-               font-family="Segoe UI, Arial, sans-serif" font-size="${Math.round(height * 0.032)}"
-               font-weight="700" fill="#ffffff">${escapeXml(badge)}</text>
-       </g>`
-    : "";
+  const titleEl = captionText(CAPTION_FONT_BOLD, title, padX, height - barH * 0.72, titleSize, "#ffffff", 700);
+  const subtitleEl = subtitle
+    ? captionText(CAPTION_FONT_REGULAR, subtitle, padX, height - barH * 0.26, subtitleSize, "#e2e8f0", 400)
+    : null;
+
+  let badgeBlock = "";
+  if (badge) {
+    const badgeInnerPad = Math.round(height * 0.018);
+    const badgeTop = Math.round(height * 0.05);
+    const badgeH = Math.round(height * 0.062);
+    // Baseline ~= vertical centre of the box plus a third of the cap height.
+    const badgeText = captionText(CAPTION_FONT_BOLD, badge, padX + badgeInnerPad, badgeTop + badgeH / 2 + badgeSize * 0.36, badgeSize, "#ffffff", 700);
+    const badgeW = Math.min(width - padX * 2, Math.round(badgeText.width + badgeInnerPad * 2));
+    badgeBlock = `<g>
+         <rect x="${padX}" y="${badgeTop}" rx="${Math.round(height * 0.012)}" width="${badgeW}" height="${badgeH}" fill="#dc2626"/>
+         ${badgeText.svg}
+       </g>`;
+  }
 
   return Buffer.from(`
     <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
@@ -1703,10 +1771,8 @@ function buildCaptionSvg(width: number, height: number, title: string, subtitle:
         </linearGradient>
       </defs>
       <rect x="0" y="${height - barH * 1.7}" width="${width}" height="${barH * 1.7}" fill="url(#captionFade)"/>
-      <text x="${padX}" y="${height - barH * 0.72}" font-family="Segoe UI, Arial, sans-serif"
-            font-size="${titleSize}" font-weight="700" fill="#ffffff">${escapeXml(title)}</text>
-      ${subtitle ? `<text x="${padX}" y="${height - barH * 0.26}" font-family="Segoe UI, Arial, sans-serif"
-            font-size="${subtitleSize}" fill="#e2e8f0">${escapeXml(subtitle)}</text>` : ""}
+      ${titleEl.svg}
+      ${subtitleEl ? subtitleEl.svg : ""}
       ${badgeBlock}
     </svg>`);
 }

@@ -1,0 +1,4 @@
+Inter (https://rsms.me/inter/) by Rasmus Andersson.
+Licensed under the SIL Open Font License, Version 1.1 (https://openfontlicense.org).
+Bundled here so listing captions render identically on every machine and container,
+independent of installed system fonts.

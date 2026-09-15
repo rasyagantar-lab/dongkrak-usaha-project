@@ -82,6 +82,7 @@ This design keeps the system efficient, auditable, and quota-aware.
 - The chosen production path for listing visuals is therefore NOT an image model: one real base photo per service category, plus a local `sharp` caption composite per listing (`POST /api/image/compose`). No provider, no key, no quota.
 - Prefer this over an image model even if bitmap generation later becomes available: it is free, deterministic, instant, watermark-free, renders exact Indonesian text reliably (image models do not), and keeps a real product photo underneath, which the quality-audit agent's factual-accuracy rules favour.
 - AI keeps the part it is actually good at: the Image Brief agent decides what the caption should say; Gemini vision can analyse an uploaded base photo. Both are text tasks on models that work.
+- The caption is rendered as vector outlines from a font bundled in the repo (`server/fonts/Inter-*.woff` via opentype.js), never via `<text>` + a system font. Reason: the hosted Linux container has no fonts and drew every glyph as a box (2026-09-15). Do not reintroduce `font-family` in the composite SVG.
 
 ### Rule 1G: Discovered models extend the chain; the registry only sets preference (2026-09-14)
 - The per-feature `models` array is the PREFERENCE order, not the limit of what a key can reach. Hardcoding two models per feature killed an agent whenever both were cooling down, while the account actually exposed ~15 usable text models.

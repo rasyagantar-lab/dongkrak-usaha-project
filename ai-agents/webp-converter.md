@@ -48,7 +48,7 @@ Update this file with:
 ## Current Implementation
 - Local conversion is available through `/api/image/convert-webp` using Sharp.
 - The route accepts a safe `public` asset path or inline base64 and returns output format, dimensions, byte sizes, and status.
-- A second local route, `/api/image/compose`, also uses Sharp: it composites caption text (title/subtitle/badge) as an SVG overlay onto a real base photo and can output the result directly as WebP (as well as PNG or JPEG) in one step, without a separate convert-webp call. It is the production path for listing images (see image-generator.md, "Production Path").
+- A second local route, `/api/image/compose`, also uses Sharp: it composites caption text (title/subtitle/badge) as an SVG overlay -- since 2026-09-15 the text is converted to `<path>` outlines from the bundled Inter font (`server/fonts/`), so the output does not depend on any system font (the hosted Linux copy had none and rendered boxes) -- onto a real base photo and can output the result directly as WebP (as well as PNG or JPEG) in one step, without a separate convert-webp call. It is the production path for listing images (see image-generator.md, "Production Path").
 - This whole feature is deterministic local image processing with no LLM call, so there is no live prompt for the application to prepend this file to. Unlike the six agent contracts, this file remains builder/human documentation only (see phase2-workflow.md, "Required Project Files").
 
 ## Validation Note

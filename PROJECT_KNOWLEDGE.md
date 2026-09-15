@@ -522,6 +522,20 @@ Verified live on cmp-001 (area = "[Nama Daerah Target]"): audit returned two `hu
 
 Caveat recorded honestly: run 2 and run 3 were SLOWER (155 s; then a pipeline collapse) because Google returned 503 "high demand" on `gemini-3.6-flash`, `flash-latest` and `2.5-flash` repeatedly during those minutes. Item 6 above came out of that. Wall-clock time remains partly at the provider's mercy; what is now under our control (dead models, pointless revisions, thinking effort, serial briefing) is fixed.
 
+## Fix - Caption Text Rendered As Boxes (Tofu) On The Hosted Copy (2026-09-15)
+Status: FIXED and VERIFIED locally; structurally proven platform-independent.
+
+The user's screenshot from the AI Studio-hosted copy showed every caption glyph in a composed listing image drawn as a hollow box. Cause: `buildCaptionSvg` emitted `<text font-family="Segoe UI, Arial, sans-serif">`, and librsvg (sharp's SVG rasteriser) resolves that through fontconfig. The Linux container has no fonts installed at all, so there is nothing to draw with -- it was never a text-encoding problem, and it never reproduced on the developer's Windows box because Segoe UI exists there.
+
+Fix (server.ts, `server/fonts/`, Dockerfile):
+- Inter Regular + Bold (SIL OFL, Latin subset, ~30 KB each, licence file alongside) are bundled in `server/fonts/` and copied into the Docker image.
+- `opentype.js` parses them at boot; `textToPath()` converts each caption string to a single `<path d="...">` outline (per-glyph: charToGlyph, pair kerning, advance width). `captionText()` emits that path, or a `<text>` element only if the font failed to load (last resort; logged at boot as `[Caption] could not load font`).
+- Per-glyph shaping deliberately bypasses opentype.js's GSUB pipeline (`font.getPath()` throws "substitutionType: 62 lookupType: 6 ... not yet supported" on Inter's contextual lookups). Indonesian is unshaped Latin, so nothing is lost.
+- Side benefit: the badge width is now measured from real advances instead of `chars * 0.55em`, so it fits its text.
+- Import gotcha: opentype.js is CommonJS. Under tsx (ESM dev mode) `import * as ns` exposes the API on `ns.default`; under the esbuild CJS bundle it is on `ns` itself. `server.ts` resolves whichever has `parse` -- the first attempt (`ns.parse` directly) failed at boot with "opentype.parse is not a function" and silently fell back to `<text>`.
+
+Verified: boot log clean (no `[Caption]` line); `POST /api/image/compose` 1024x1024 PNG in 259 ms; the caption SVG for the test strings contains 3 `<path`, 0 `<text`, 0 `font-family`, and no character mapped to `.notdef`; the PNG was visually reviewed (title, subtitle, badge all crisp in Inter). Because no system font is consulted anywhere, the Linux output is the same bytes -- the only remaining check on the hosted copy is a redeploy.
+
 ## Roadmap Completion Summary (2026-09-14)
 All four phases of the approved plan are implemented. Evidence status per phase:
 - Phase 1 MD contracts: PROVEN (sentinel twice, notes on disk, then real notes from a production siege run).
