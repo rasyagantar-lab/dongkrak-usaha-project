@@ -921,6 +921,53 @@ app.get("/api/gemini/models", async (req, res) => {
 });
 
 // 2. Campaigns API
+// ---- Backup / restore ----
+// Hosting without a bucket (AI Studio today) loses data/ on every restart, and even
+// with a bucket the team wants a file they can keep. One JSON holds campaigns +
+// publish history; restore merges by id (incoming wins) or replaces everything.
+app.get("/api/backup", (req, res) => {
+  const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+  res.setHeader("Content-Disposition", `attachment; filename="dongkrakusaha-backup-${stamp}.json"`);
+  res.json({
+    format: "dongkrakusaha-backup",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    storageMode: storage.STORAGE_MODE,
+    campaigns: campaignsStore,
+    history: OfficialDongkrakUsahaAdapter.getHistory()
+  });
+});
+
+app.post("/api/restore", (req, res) => {
+  const body = req.body || {};
+  if (body.format !== "dongkrakusaha-backup" || !Array.isArray(body.campaigns)) {
+    return res.status(400).json({ error: "File bukan cadangan DongkrakUsaha (format tidak dikenali)." });
+  }
+  const mode: "merge" | "replace" = body.mode === "replace" ? "replace" : "merge";
+  const incomingCampaigns: Campaign[] = body.campaigns.filter((c: any) => c && typeof c.id === "string" && c.businessData);
+  const incomingHistory: any[] = Array.isArray(body.history) ? body.history.filter((r: any) => r && typeof r.id === "string") : [];
+
+  let added = 0, updated = 0;
+  if (mode === "replace") {
+    campaignsStore = incomingCampaigns;
+    added = incomingCampaigns.length;
+    OfficialDongkrakUsahaAdapter.replaceHistory(incomingHistory);
+  } else {
+    const byId = new Map(campaignsStore.map(c => [c.id, c]));
+    for (const c of incomingCampaigns) {
+      if (byId.has(c.id)) updated++; else added++;
+      byId.set(c.id, c);
+    }
+    campaignsStore = [...byId.values()];
+    const hist = new Map(OfficialDongkrakUsahaAdapter.getHistory().map(r => [r.id, r]));
+    for (const r of incomingHistory) hist.set(r.id, r);
+    OfficialDongkrakUsahaAdapter.replaceHistory([...hist.values()].sort((a: any, b: any) => String(b.timestamp || b.createdAt || "").localeCompare(String(a.timestamp || a.createdAt || ""))));
+  }
+  persistCampaigns();
+  console.log(`[Restore] mode=${mode} campaigns +${added} ~${updated} history=${incomingHistory.length} storage=${storage.STORAGE_MODE}`);
+  res.json({ ok: true, mode, campaignsAdded: added, campaignsUpdated: updated, historyRecords: incomingHistory.length, totalCampaigns: campaignsStore.length });
+});
+
 app.get("/api/campaigns", (req, res) => {
   res.json(campaignsStore);
 });

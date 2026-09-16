@@ -70,6 +70,12 @@ export class OfficialDongkrakUsahaAdapter implements DongkrakUsahaPublisher {
     return publishRecordsStore;
   }
 
+  // Backup/restore: replace the whole store and write it through.
+  public static replaceHistory(records: PublishRecord[]) {
+    publishRecordsStore = Array.isArray(records) ? records : [];
+    persistHistory();
+  }
+
   public static addHistoryRecord(record: PublishRecord) {
     publishRecordsStore.unshift(record);
     persistHistory();

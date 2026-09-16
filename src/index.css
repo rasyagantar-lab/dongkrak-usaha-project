@@ -88,7 +88,7 @@
 /* ---- GitHub profile README inside the splash (2026-09-16) ----
    GitHub's rendered HTML relies on the `align` attribute and inline widths; this
    gives it a GitHub-like baseline without pulling in github-markdown-css. */
-.gh-readme { font-size: 13px; line-height: 1.55; color: #1f2937; word-break: break-word; }
+.gh-readme { font-size: 14px; line-height: 1.55; color: #1f2937; word-break: break-word; }
 .gh-readme .markdown-body > *:first-child { margin-top: 0; }
 .gh-readme h1, .gh-readme h2, .gh-readme h3 { font-weight: 700; color: #0f172a; margin: 1.1em 0 0.5em; line-height: 1.25; }
 .gh-readme h1 { font-size: 1.35em; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3em; }

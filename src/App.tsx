@@ -318,6 +318,7 @@ export default function App() {
           <ConnectionSettings
             connectionConfig={connectionConfig}
             onUpdateConnection={handleUpdateConnection}
+            onReloadCampaigns={handleReloadCampaigns}
           />
         </TabPanel>
 

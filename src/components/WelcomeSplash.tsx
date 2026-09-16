@@ -120,7 +120,7 @@ export const WelcomeSplash: React.FC = () => {
     >
       <div
         onClick={e => e.stopPropagation()}
-        className={`relative w-full max-w-2xl max-h-[92vh] flex flex-col bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden motion-reduce:animate-none ${
+        className={`relative w-full max-w-3xl max-h-[94vh] flex flex-col bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden motion-reduce:animate-none ${
           closing ? 'animate-du-scale-out' : 'animate-du-scale-in'
         }`}
       >
@@ -132,15 +132,15 @@ export const WelcomeSplash: React.FC = () => {
         {/* Header: mark + title + tabs */}
         <div className="relative px-6 sm:px-7 pt-6 pb-3">
           <div className="flex items-start gap-4 animate-du-rise motion-reduce:animate-none" style={rise(0)}>
-            <div className="w-14 h-14 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md shrink-0 animate-du-breathe motion-reduce:animate-none">
-              <Globe className="w-7 h-7" />
+            <div className="w-16 h-16 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md shrink-0 animate-du-breathe motion-reduce:animate-none">
+              <Globe className="w-8 h-8" />
             </div>
             <div className="min-w-0">
               <div className="text-3xs font-semibold text-blue-600 uppercase tracking-[0.2em]">DongkrakUsaha · v{APP_VERSION}</div>
-              <h1 id="du-splash-title" className="text-xl sm:text-2xl font-bold text-slate-900 leading-tight tracking-tight mt-0.5">
+              <h1 id="du-splash-title" className="text-2xl sm:text-3xl font-bold text-slate-900 leading-tight tracking-tight mt-0.5">
                 AI Marketing Suite
               </h1>
-              <p className="text-xs sm:text-sm text-slate-500 mt-1 leading-relaxed">
+              <p className="text-sm sm:text-base text-slate-500 mt-1 leading-relaxed">
                 Satu bisnis, seluruh wilayah — dari data bisnis sampai listing terbit.
               </p>
             </div>
@@ -155,11 +155,11 @@ export const WelcomeSplash: React.FC = () => {
                   key={t.id}
                   type="button"
                   onClick={() => setTab(t.id)}
-                  className={`flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                  className={`flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-sm font-semibold transition-colors cursor-pointer ${
                     active ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
-                  <Icon className="w-3.5 h-3.5" />
+                  <Icon className="w-4 h-4" />
                   {t.label}
                 </button>
               );
@@ -175,7 +175,7 @@ export const WelcomeSplash: React.FC = () => {
                 {STEPS.map((s, i) => {
                   const Icon = s.icon;
                   return (
-                    <li key={s.text} className="flex items-center gap-3 text-sm text-slate-700 animate-du-rise motion-reduce:animate-none" style={rise(2 + i)}>
+                    <li key={s.text} className="flex items-center gap-3 text-base text-slate-700 animate-du-rise motion-reduce:animate-none" style={rise(2 + i)}>
                       <span className="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
                         <Icon className="w-3.5 h-3.5" />
                       </span>
@@ -288,7 +288,7 @@ export const WelcomeSplash: React.FC = () => {
                   {/* Rendered by GitHub, proxied and sanitised by our server (no scripts,
                       no inline handlers). Scrolls inside the card. */}
                   <div
-                    className="gh-readme max-h-[52vh] overflow-y-auto p-4"
+                    className="gh-readme max-h-[58vh] overflow-y-auto p-4 sm:p-5"
                     dangerouslySetInnerHTML={{ __html: profile.readmeHtml }}
                   />
                 </div>
@@ -306,7 +306,7 @@ export const WelcomeSplash: React.FC = () => {
             type="button"
             onClick={dismiss}
             autoFocus
-            className="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white text-sm font-semibold rounded-xl px-4 py-3 transition-colors transition-transform motion-reduce:transition-none cursor-pointer"
+            className="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white text-base font-semibold rounded-xl px-4 py-3.5 transition-colors transition-transform motion-reduce:transition-none cursor-pointer"
           >
             Mulai
             <ArrowRight className="w-4 h-4" />

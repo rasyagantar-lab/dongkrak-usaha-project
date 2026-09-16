@@ -630,6 +630,18 @@ Verified: API returns 25.5 KB of HTML with 0 relative paths left and 0 scripts; 
 
 Note: the README's header image is a 1.2 MB PNG served from raw.githubusercontent.com; it is the user's own asset and loads only when the GitHub tab is opened.
 
+## Data Loss On AI Studio Confirmed; Backup/Restore Added; Splash Enlarged; Changelog Trimmed (2026-09-16)
+Status: backup/restore VERIFIED (API round trip + browser download); the AI Studio loss itself is EXPECTED behaviour, not a bug, and is only truly fixed by `GCS_BUCKET`.
+
+User report: campaigns and publish history disappeared on the AI Studio copy. Cause is the one already recorded: AI Studio runs the app without `GCS_BUCKET`, so `server/storage.ts` writes to the container's disk, which is discarded on every redeploy/restart. The permanent fix is the operator's: DEPLOY_CLOUD_RUN.md steps 1 (bucket) and 4 (Storage Object Admin for the service account) and `GCS_BUCKET` in AI Studio's environment, then confirm `[Startup] storage=gcs` in the log. Until then the hosted copy is a demo, not a store.
+
+Safety net that works on any hosting (this session):
+- `GET /api/backup` -> one JSON (`format: dongkrakusaha-backup`, version 1, campaigns + publish history, storage mode, timestamp) with a Content-Disposition filename. `POST /api/restore` accepts that file; `mode: merge` (default; upsert by id, incoming wins, history merged by id) or `mode: replace`; rejects anything without the format marker. Adapter gained `replaceHistory()`. Body limit was already 10 MB (a 33-campaign backup is 215 KB).
+- `BackupPanel.tsx` at the top of the Koneksi tab: "Unduh cadangan (JSON)", "Pulihkan dari file" with a merge/replace selector (replace asks for confirmation), result line. Written for the team: why it exists and when to use it.
+- Verified: backup of 33 campaigns downloaded (browser download event observed, filename `dongkrakusaha-backup-<stamp>.json`); the file plus one fabricated campaign restored in merge mode -> +1 added, 33 updated, total 34; test campaign deleted; a non-backup JSON rejected with 400.
+
+Also in this batch: splash card enlarged (max-w-3xl, bigger title/tabs/steps, README box 58vh) after "kurang besar"; changelog cut to engine + audience-facing UI only, per the user ("jangan semua diceritain").
+
 ## Roadmap Completion Summary (2026-09-14)
 All four phases of the approved plan are implemented. Evidence status per phase:
 - Phase 1 MD contracts: PROVEN (sentinel twice, notes on disk, then real notes from a production siege run).

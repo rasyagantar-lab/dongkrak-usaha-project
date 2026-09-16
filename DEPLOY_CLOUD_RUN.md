@@ -86,3 +86,6 @@ Ekstensi sudah mengizinkan `https://*.run.app/*`. Unduh zip-nya dari tab Koneksi
 
 ## Kalau gagal
 Kembali ke cara lokal: `git checkout master` di laptop, `npm run dev`. Tidak ada yang perlu di-undo — data lokal (`data/`, `.env`, foto) tidak pernah disentuh eksperimen ini.
+
+## Sementara belum ada bucket: Cadangan Data (2026-09-16)
+Tanpa `GCS_BUCKET`, data di hosting hilang setiap server dimulai ulang -- ini sudah terjadi di AI Studio. Sampai bucket dipasang, pakai tab **Koneksi -> Cadangan Data**: unduh file JSON (semua campaign + riwayat) sebelum menutup sesi, dan pulihkan lewat "Pulihkan dari file" setelah deploy/restart. File yang sama juga dipakai untuk memindahkan data dari laptop ke hosting.

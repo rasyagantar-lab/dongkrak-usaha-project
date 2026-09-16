@@ -20,15 +20,18 @@ import {
   FileSpreadsheet
 } from 'lucide-react';
 import { DongkrakUsahaConnectionConfig } from '../types';
+import { BackupPanel } from './BackupPanel';
 
 interface ConnectionSettingsProps {
   connectionConfig: DongkrakUsahaConnectionConfig;
   onUpdateConnection: (config: DongkrakUsahaConnectionConfig) => void;
+  onReloadCampaigns: () => Promise<void>;
 }
 
 export const ConnectionSettings: React.FC<ConnectionSettingsProps> = ({
   connectionConfig,
-  onUpdateConnection
+  onUpdateConnection,
+  onReloadCampaigns
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [testResultMsg, setTestResultMsg] = useState<{ text: string; success: boolean } | null>(null);
@@ -46,6 +49,8 @@ export const ConnectionSettings: React.FC<ConnectionSettingsProps> = ({
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
+      <BackupPanel onReloadCampaigns={onReloadCampaigns} />
+
       {/* Banner */}
       <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
