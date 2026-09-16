@@ -653,6 +653,7 @@ Repository:
 Splash v4 (`WelcomeSplash.tsx`): one wide two-pane dialog. Left = how it works (3 steps), credits, and the developer's GitHub card (`rasyagantar-lab`) that expands IN PLACE to the profile README (no separate tab, per the owner). Right = Log Update. Panes scroll independently on desktop, stack on phones; header/footer fixed height.
 - `/api/github/profile` now defaults to `rasyagantar-lab` and HEAD-checks the README's relative assets, dropping images whose file is missing in the profile repo instead of rendering broken ones. Observed: `assets/divider.png` is not yet in the new profile repo -> 4 uses dropped; 43/43 remaining images load, "Languages and Tools" present. Once the owner copies `assets/divider.png` over, it appears without a code change.
 - Verified: API login/name correct; README 24 KB, 0 relative paths left; browser: 43 images loaded, 0 broken, box scrolls; 400 px width has no overflow; no page errors.
+- Read-gate (owner request): "Mulai" is disabled, and Esc/click-outside refused with a nudge, until the Log Update has been scrolled to the bottom (desktop: right pane; phone: the whole card). Progress fills the button (scaleX). A pane that fits without scrolling counts as read. Verified headless at both widths: locked at 0-2%, Esc refused, unlocked after scroll, closes on Mulai.
 
 ## Roadmap Completion Summary (2026-09-14)
 All four phases of the approved plan are implemented. Evidence status per phase:

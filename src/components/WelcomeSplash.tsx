@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Globe, ArrowRight, Building2, Workflow, Send, Github, ExternalLink, History, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 import { CHANGELOG, APP_VERSION } from '../changelog';
 
@@ -55,6 +55,31 @@ export const WelcomeSplash: React.FC = () => {
   const [never, setNever] = useState(false);
 
   const [readmeOpen, setReadmeOpen] = useState(false);
+
+  // "Read before you continue": Mulai stays disabled until the Log Update has been
+  // scrolled to the bottom. On desktop that is the right pane; on phones the whole
+  // card scrolls as one and the log sits at the bottom, so the wrapper is measured.
+  // A pane that fits without scrolling counts as read. Esc / click-outside honour
+  // the same gate, otherwise it would be decorative.
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const logRef = useRef<HTMLElement>(null);
+  const [readPct, setReadPct] = useState(0);
+  const [nudge, setNudge] = useState(0);
+  const hasRead = readPct >= 100;
+  const measureRead = useCallback(() => {
+    const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
+    const el = isDesktop ? logRef.current : wrapRef.current;
+    if (!el) return;
+    const max = el.scrollHeight - el.clientHeight;
+    const pct = max <= 4 ? 100 : Math.min(100, Math.round(((el.scrollTop + 4) / max) * 100));
+    setReadPct(prev => (pct > prev ? pct : prev)); // reading is monotonic
+  }, []);
+  useEffect(() => {
+    if (!visible) return;
+    const t = setTimeout(measureRead, 400); // after the rise-in animation settles
+    window.addEventListener('resize', measureRead);
+    return () => { clearTimeout(t); window.removeEventListener('resize', measureRead); };
+  }, [visible, readmeOpen, measureRead]);
   const [profile, setProfile] = useState<GithubProfile | null>(null);
   const [profileState, setProfileState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
 
@@ -68,7 +93,7 @@ export const WelcomeSplash: React.FC = () => {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, never]);
+  }, [visible, never, hasRead]);
 
   // The README is fetched only when the card is expanded -- it is the heaviest
   // thing on this screen and most sessions never open it.
@@ -87,6 +112,7 @@ export const WelcomeSplash: React.FC = () => {
 
   const dismiss = () => {
     if (closing) return;
+    if (!hasRead) { setNudge(n => n + 1); return; }
     setClosing(true);
     writeFlag('session', SESSION_KEY);
     if (never) writeFlag('local', NEVER_KEY);
@@ -139,7 +165,7 @@ export const WelcomeSplash: React.FC = () => {
         </div>
 
         {/* Two panes; stacked on phones. Each pane scrolls on its own. */}
-        <div className="relative flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] overflow-y-auto lg:overflow-hidden">
+        <div ref={wrapRef} onScroll={measureRead} className="relative flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] overflow-y-auto lg:overflow-hidden">
           {/* LEFT: about + credits + GitHub */}
           <section className="lg:overflow-y-auto px-6 sm:px-8 py-5 space-y-5 lg:border-r border-slate-100">
             <div>
@@ -236,7 +262,7 @@ export const WelcomeSplash: React.FC = () => {
           </section>
 
           {/* RIGHT: update log */}
-          <section className="lg:overflow-y-auto px-6 sm:px-8 py-5 bg-slate-50/60">
+          <section ref={logRef} onScroll={measureRead} className="lg:overflow-y-auto px-6 sm:px-8 py-5 bg-slate-50/60">
             <div className="flex items-center gap-2 text-3xs font-semibold text-slate-400 uppercase tracking-wider mb-3 animate-du-rise motion-reduce:animate-none" style={rise(2)}>
               <History className="w-3.5 h-3.5" /> Log Update
             </div>
@@ -266,15 +292,32 @@ export const WelcomeSplash: React.FC = () => {
 
         {/* Footer */}
         <div className="relative shrink-0 px-6 sm:px-8 py-4 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center gap-3 bg-white">
-          <button
-            type="button"
-            onClick={dismiss}
-            autoFocus
-            className="sm:w-64 inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white text-base font-semibold rounded-xl px-4 py-3 transition-colors transition-transform motion-reduce:transition-none cursor-pointer"
-          >
-            Mulai
-            <ArrowRight className="w-4 h-4" />
-          </button>
+          <div className="sm:w-72 flex flex-col gap-1.5">
+            <button
+              type="button"
+              onClick={dismiss}
+              disabled={!hasRead}
+              autoFocus
+              title={hasRead ? undefined : 'Scroll Log Update sampai bawah dulu'}
+              className={`relative overflow-hidden inline-flex items-center justify-center gap-2 text-white text-base font-semibold rounded-xl px-4 py-3 transition-colors transition-transform motion-reduce:transition-none ${
+                hasRead ? 'bg-blue-600 hover:bg-blue-700 active:scale-[0.98] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'
+              }`}
+            >
+              {/* Reading progress fills the button from the left (transform only). */}
+              {!hasRead && (
+                <span aria-hidden="true" className="absolute inset-0 bg-blue-500/70 origin-left transition-transform duration-300 ease-out motion-reduce:transition-none" style={{ transform: `scaleX(${readPct / 100})` }} />
+              )}
+              <span className="relative inline-flex items-center gap-2">
+                {hasRead ? 'Mulai' : `Baca dulu · ${readPct}%`}
+                <ArrowRight className="w-4 h-4" />
+              </span>
+            </button>
+            {!hasRead && (
+              <span key={nudge} className={`text-3xs text-slate-500 text-center ${nudge ? 'animate-du-scale-in motion-reduce:animate-none text-rose-600 font-semibold' : ''}`}>
+                {nudge ? 'Belum bisa — scroll Log Update sampai bawah dulu 😄' : 'Scroll Log Update sampai bawah untuk melanjutkan'}
+              </span>
+            )}
+          </div>
           <label className="inline-flex items-center gap-2 text-2xs text-slate-500 cursor-pointer select-none sm:pl-1">
             <input
               type="checkbox"
@@ -284,7 +327,7 @@ export const WelcomeSplash: React.FC = () => {
             />
             Jangan tampilkan lagi
           </label>
-          <span className="sm:ml-auto text-3xs text-slate-400">Esc atau klik di luar untuk menutup</span>
+          <span className="sm:ml-auto text-3xs text-slate-400">{hasRead ? 'Esc atau klik di luar untuk menutup' : 'Kartu ini terkunci sampai selesai dibaca'}</span>
         </div>
       </div>
     </div>
