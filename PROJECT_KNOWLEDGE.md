@@ -655,6 +655,19 @@ Splash v4 (`WelcomeSplash.tsx`): one wide two-pane dialog. Left = how it works (
 - Verified: API login/name correct; README 24 KB, 0 relative paths left; browser: 43 images loaded, 0 broken, box scrolls; 400 px width has no overflow; no page errors.
 - Read-gate (owner request): "Mulai" is disabled, and Esc/click-outside refused with a nudge, until the Log Update has been scrolled to the bottom (desktop: right pane; phone: the whole card). Progress fills the button (scaleX). A pane that fits without scrolling counts as read. Verified headless at both widths: locked at 0-2%, Esc refused, unlocked after scroll, closes on Mulai.
 
+## Persistence On AI Studio: Storage Probe + Operator-Visible Status (2026-09-17)
+Status: probe VERIFIED in both modes locally; GCS end-to-end still awaits the owner's bucket (the code path now reports its own success or failure, so the next deploy is self-proving).
+
+Owner report: campaigns, base images and history reset whenever the AI Studio container is stopped or restarted. Cause unchanged and expected: no `GCS_BUCKET` there, so `server/storage.ts` runs in local mode on a disposable disk. The storage layer itself already routes every runtime write (campaigns, history, base photos, generated images, agent logs) through the bucket when configured -- what was missing was the bucket and a way to SEE whether it works.
+
+Added:
+- `storage.probe()`: writes `data/.probe-<ts>.json`, reads it back, deletes it; returns `{mode, bucket, persistent, ok, latencyMs, error?, hint?}`. Hints map the provider's messages to the fix ("bucket does not exist" -> check GCS_BUCKET; 403 -> grant Storage Object Admin; missing ADC -> laptop only).
+- Startup logs the probe result: `[Startup] storage probe ok (local, 4 ms) -- NOT persistent on hosted containers: set GCS_BUCKET` or `... probe FAILED (gcs bucket=X): <error> -- <hint>`. This is the line every hosted deploy is judged by.
+- `GET /api/storage/status` runs the same probe on demand; the Koneksi -> Cadangan Data card shows it as a status line (green = bucket connected; amber = local disk, not persistent on hosting; red = configured but failing, with the fix) and a re-check button.
+- DEPLOY_CLOUD_RUN.md gained an AI Studio-specific section: create the bucket in the same project, set `GCS_BUCKET` where the Gemini keys are set, redeploy, confirm the green line, then restore the last backup.
+
+Verified: local probe ok in 2-4 ms, no leftover probe file; forced gcs mode with a non-existent bucket -> `ok:false`, error "The specified bucket does not exist.", hint about GCS_BUCKET spelling, `persistent:false`; browser shows the amber local-disk line in Koneksi. Not yet verified (owner's step): a real bucket turning the line green on AI Studio.
+
 ## Roadmap Completion Summary (2026-09-14)
 All four phases of the approved plan are implemented. Evidence status per phase:
 - Phase 1 MD contracts: PROVEN (sentinel twice, notes on disk, then real notes from a production siege run).

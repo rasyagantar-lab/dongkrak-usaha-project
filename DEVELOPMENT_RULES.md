@@ -14,6 +14,26 @@ This file is a pointer, not the source of truth. The project's memory lives in t
 
 A task without step 4 is not finished.
 
+## The owner's four working rules (restated 2026-09-17; not optional)
+1. **Read before working.** Open the MD files the task touches before changing anything (map below).
+2. **Write after working.** Record what changed, why, what was verified, what remains -- in the MD files -- before calling the task done.
+3. **Grow the MDs.** Every task should leave the MDs more useful than it found them: sharper rules, new gotchas, corrected claims. Delete what turned out to be wrong.
+4. **Read with a budget.** The assistant's quota is finite; do not re-read everything every time, and do not skim what matters. Follow the reading map below exactly -- "which file, which section" -- and extend the map when a new kind of task appears. Guessing at what to read is not allowed.
+
+## Reading map (rule 4): what to read, per kind of task
+Always, at session start (cheap): this file top to bottom, then `PROJECT_KNOWLEDGE.md` **"Current Phase"** (top) and the **last three dated entries** (bottom of the log, above "Roadmap Completion Summary"). That is enough to know where things stand.
+Then, by task type -- read only these, fully:
+| Task touches | Read in full |
+|---|---|
+| Any AI agent, prompt, model chain, quota/router behaviour | `AI_MODELS.md` (registry + Rules 1A-1L, 4) and the agent's own `ai-agents/<feature>.md`; `ai-agents/orchestrator.md` if the pipeline order or hand-off changes |
+| Orchestrator timing / "slow" reports | `PROJECT_KNOWLEDGE.md` "Operator Feedback Round 3" and "Round 4"; then the run's Task Ledger attempt trail (evidence first, code second) |
+| Extension / publishing / DongkrakUsaha form | `ai-agents/phase2-workflow.md`; `PROJECT_KNOWLEDGE.md` entries "Input Produk", "Share web", "Bug 1-5"; `public/extension/` is the only extension source |
+| Hosting, persistence, AI Studio, Cloud Run | `PROJECT_KNOWLEDGE.md` "EXPERIMENT" section; `DEPLOY_CLOUD_RUN.md`; `server/storage.ts` header comment |
+| UI / animation / splash / navigation | this file's "UI conventions"; `PROJECT_KNOWLEDGE.md` "UI Pass 2" and the latest splash entry; `src/changelog.ts` (add an entry) |
+| Images / captions / base photos | `AI_MODELS.md` Rule 1F and 1J; `ai-agents/image-generator.md`; `ai-agents/webp-converter.md` |
+| Git, accounts, repository hygiene | this file's "Commits" and "Branches"; `PROJECT_KNOWLEDGE.md` "History Rewritten" and "Repository Moved" |
+Do NOT read by default: `bun.lock`, `package-lock.json`, generated `dist/`, old zips in Downloads, the full 600-line knowledge file when only one section is relevant. When a task spans two rows, read both. When it fits none, say so and add a row after the task.
+
 ## Evidence discipline
 - Status vocabulary: HYPOTHESIS → SUPPORTED → FIXED BUT UNVERIFIED → PROVEN / VERIFIED. Never claim the higher rung without runtime evidence.
 - Never state a model, provider, or API is available from memory or documentation alone (AI_MODELS.md Rule 4). Probe it.

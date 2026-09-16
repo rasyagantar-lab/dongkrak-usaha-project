@@ -942,6 +942,13 @@ app.get("/api/gemini/models", async (req, res) => {
 // Hosting without a bucket (AI Studio today) loses data/ on every restart, and even
 // with a bucket the team wants a file they can keep. One JSON holds campaigns +
 // publish history; restore merges by id (incoming wins) or replaces everything.
+// Storage health for the operator (Koneksi -> Cadangan Data). Runs the same
+// write/read/delete round trip as the startup probe so the hosted copy can be
+// checked from the screen instead of from the log.
+app.get("/api/storage/status", async (req, res) => {
+  res.json(await storage.probe());
+});
+
 app.get("/api/backup", (req, res) => {
   const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
   res.setHeader("Content-Disposition", `attachment; filename="dongkrakusaha-backup-${stamp}.json"`);
@@ -3005,6 +3012,11 @@ async function startServer() {
     .map(c => `${c.apiKeyEnv}=${process.env[c.apiKeyEnv]?.trim() ? "set" : "MISSING"}`);
   console.log(`[Startup] storage=${storage.STORAGE_MODE}${storage.STORAGE_MODE === "gcs" ? ` bucket=${process.env.GCS_BUCKET}` : ""} node_env=${process.env.NODE_ENV || "development"}`);
   console.log(`[Startup] keys: ${configured.join(", ")}`);
+  // Prove persistence at boot: the line every deploy is judged by.
+  storage.probe().then(p => {
+    if (p.ok) console.log(`[Startup] storage probe ok (${p.mode}${p.bucket ? ` bucket=${p.bucket}` : ""}, ${p.latencyMs} ms)${p.persistent ? "" : " -- NOT persistent on hosted containers: set GCS_BUCKET"}`);
+    else console.error(`[Startup] storage probe FAILED (${p.mode}${p.bucket ? ` bucket=${p.bucket}` : ""}): ${p.error}${p.hint ? ` -- ${p.hint}` : ""}`);
+  });
   console.log(`[Startup] cloudflare: ${process.env.CLOUDFLARE_ACCOUNT_ID?.trim() && process.env.CLOUDFLARE_API_TOKEN_BITMAP?.trim() ? "set" : "not configured"}`);
 
   if (process.env.NODE_ENV !== "production") {

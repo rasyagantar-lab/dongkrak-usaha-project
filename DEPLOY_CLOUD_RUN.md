@@ -87,5 +87,19 @@ Ekstensi sudah mengizinkan `https://*.run.app/*`. Unduh zip-nya dari tab Koneksi
 ## Kalau gagal
 Kembali ke cara lokal: `git checkout master` di laptop, `npm run dev`. Tidak ada yang perlu di-undo — data lokal (`data/`, `.env`, foto) tidak pernah disentuh eksperimen ini.
 
+## Di AI Studio: cara membuat data permanen (2026-09-17)
+AI Studio menjalankan app ini di Cloud Run milik project Google Cloud lu. Disk container dibuang setiap deploy/restart/scale-to-zero — itu sebabnya campaign, riwayat, dan foto hilang. Obatnya sama dengan Cloud Run biasa: **bucket + variabel `GCS_BUCKET`**.
+
+1. **Bucket** — Cloud Console (project yang sama dengan yang dipakai AI Studio; namanya terlihat di halaman deploy AI Studio / di Cloud Run console) → Cloud Storage → Buckets → Create. Nama unik (misal `dongkrakusaha-data-rasya`), region Jakarta/Singapura, private. Catat namanya.
+2. **Variabel** — di AI Studio, di tempat yang sama lu mengisi `GEMINI_API_KEY_*`, tambahkan `GCS_BUCKET` = nama bucket. Deploy ulang.
+3. **Bukti** — buka app → tab **Koneksi → Cadangan Data**. Baris status harus hijau: *"Penyimpanan permanen aktif — bucket … tersambung (tes tulis/baca N ms)"*. Server menulis, membaca, lalu menghapus satu objek uji; kalau hijau, data benar-benar tersimpan. Baris yang sama ada di log startup: `[Startup] storage probe ok (gcs bucket=…)`.
+4. **Kalau merah**, baris itu menyebut sebabnya dan perbaikannya:
+   - *"Bucket tidak ditemukan"* → ejaan `GCS_BUCKET` / project berbeda.
+   - *"Service account belum punya izin"* → bucket → Permissions → Grant access → service account Cloud Run (`…-compute@developer.gserviceaccount.com`) → role **Storage Object Admin** → deploy ulang.
+   - *"Kredensial tidak ditemukan"* → hanya terjadi di laptop; di Cloud Run tidak.
+5. **Isi ulang data** — setelah hijau, pulihkan file cadangan terakhir lewat "Pulihkan dari file". Foto dasar yang diunggah sebelum ini harus diunggah ulang (yang lama ikut hilang bersama disk).
+
+Yang ikut ke bucket saat mode ini aktif: campaign, riwayat publish, foto dasar, gambar hasil compose, dan catatan Self-Improvement agent. Aturan agent (`ai-agents/*.md`) tetap dari repo -- mengeditnya butuh deploy ulang.
+
 ## Sementara belum ada bucket: Cadangan Data (2026-09-16)
 Tanpa `GCS_BUCKET`, data di hosting hilang setiap server dimulai ulang -- ini sudah terjadi di AI Studio. Sampai bucket dipasang, pakai tab **Koneksi -> Cadangan Data**: unduh file JSON (semua campaign + riwayat) sebelum menutup sesi, dan pulihkan lewat "Pulihkan dari file" setelah deploy/restart. File yang sama juga dipakai untuk memindahkan data dari laptop ke hosting.

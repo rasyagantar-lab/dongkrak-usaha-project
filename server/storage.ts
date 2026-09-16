@@ -116,6 +116,44 @@ export async function remove(key: string): Promise<void> {
   await (await bucket()).file(key).delete({ ignoreNotFound: true });
 }
 
+export interface StorageProbe {
+  mode: StorageMode;
+  bucket: string | null;
+  persistent: boolean;      // true only when writes survive a container restart
+  ok: boolean;              // write -> read -> delete round trip succeeded
+  latencyMs: number;
+  error?: string;
+  hint?: string;            // what to do about the error, for the operator
+  checkedAt: string;
+}
+
+// Writes, reads back and deletes one small object. This is the only way to KNOW
+// that the hosted copy can keep data: the mode alone says what was configured, not
+// whether the bucket exists or the service account may write to it.
+export async function probe(): Promise<StorageProbe> {
+  const t0 = Date.now();
+  const key = `data/.probe-${t0}.json`;
+  const payload = JSON.stringify({ probe: true, at: t0 });
+  const base = { mode: STORAGE_MODE, bucket: STORAGE_MODE === "gcs" ? BUCKET_NAME : null, persistent: STORAGE_MODE === "gcs", checkedAt: new Date(t0).toISOString() };
+  try {
+    await writeText(key, payload);
+    const back = await readText(key);
+    await remove(key);
+    if (back !== payload) throw new Error("read-back mismatch");
+    return { ...base, ok: true, latencyMs: Date.now() - t0 };
+  } catch (err: any) {
+    const msg = String(err?.message || err);
+    let hint: string | undefined;
+    if (STORAGE_MODE === "gcs") {
+      if (/403|permission|forbidden|does not have/i.test(msg)) hint = "Service account layanan belum punya izin: bucket -> Permissions -> Grant access -> role Storage Object Admin.";
+      else if (/404|notfound|not found|no such bucket|does not exist/i.test(msg)) hint = "Bucket tidak ditemukan: cek ejaan GCS_BUCKET dan pastikan bucket ada di project yang sama.";
+      else if (/could not load the default credentials|ADC|credential/i.test(msg)) hint = "Kredensial tidak ditemukan: di Cloud Run pakai service account layanan (ADC); di laptop butuh gcloud auth application-default login.";
+      else hint = "Lihat log server untuk detail; data TIDAK tersimpan sampai ini hijau.";
+    }
+    return { ...base, persistent: false, ok: false, latencyMs: Date.now() - t0, error: msg.slice(0, 300), hint };
+  }
+}
+
 export function contentTypeFor(key: string): string {
   const ext = key.toLowerCase().split(".").pop();
   switch (ext) {

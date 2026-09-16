@@ -1,5 +1,16 @@
-import React, { useRef, useState } from 'react';
-import { DatabaseBackup, Download, Upload, RefreshCw, CheckCircle2, AlertTriangle } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { DatabaseBackup, Download, Upload, RefreshCw, CheckCircle2, AlertTriangle, HardDrive, Cloud, XCircle } from 'lucide-react';
+
+interface StorageProbe {
+  mode: 'local' | 'gcs';
+  bucket: string | null;
+  persistent: boolean;
+  ok: boolean;
+  latencyMs: number;
+  error?: string;
+  hint?: string;
+  checkedAt: string;
+}
 
 /*
   Cadangan Data. One JSON file = every campaign + the publish history. Exists because
@@ -15,6 +26,23 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ onReloadCampaigns }) =
   const [mode, setMode] = useState<'merge' | 'replace'>('merge');
   const [busy, setBusy] = useState<'download' | 'restore' | null>(null);
   const [msg, setMsg] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
+
+  // Where does the data live right now, and can it actually be written? Answered by
+  // a real write/read/delete round trip on the server, not by configuration alone.
+  const [probe, setProbe] = useState<StorageProbe | null>(null);
+  const [probing, setProbing] = useState(false);
+  const runProbe = async () => {
+    setProbing(true);
+    try {
+      const res = await fetch('/api/storage/status');
+      setProbe(await res.json());
+    } catch {
+      setProbe(null);
+    } finally {
+      setProbing(false);
+    }
+  };
+  useEffect(() => { runProbe(); }, []);
 
   const handleDownload = async () => {
     setBusy('download');
@@ -75,6 +103,36 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ onReloadCampaigns }) =
             pulihkan di sini kapan pun, termasuk untuk memindahkan data antar laptop.
           </p>
         </div>
+      </div>
+
+      {/* Storage status */}
+      <div className={`rounded-lg border px-3 py-2.5 text-xs flex items-start gap-2.5 ${
+        !probe ? 'bg-slate-50 border-slate-200 text-slate-600'
+          : !probe.ok ? 'bg-rose-50 border-rose-200 text-rose-800'
+          : probe.persistent ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+          : 'bg-amber-50 border-amber-200 text-amber-900'
+      }`}>
+        <span className="shrink-0 mt-0.5">
+          {!probe ? <RefreshCw className="w-4 h-4 animate-spin" />
+            : !probe.ok ? <XCircle className="w-4 h-4" />
+            : probe.persistent ? <Cloud className="w-4 h-4" />
+            : <HardDrive className="w-4 h-4" />}
+        </span>
+        <div className="min-w-0 flex-1 leading-relaxed">
+          {!probe && <span>Memeriksa penyimpanan...</span>}
+          {probe && probe.ok && probe.persistent && (
+            <span><strong>Penyimpanan permanen aktif</strong> — bucket <code className="font-mono">{probe.bucket}</code> tersambung (tes tulis/baca {probe.latencyMs} ms). Data aman saat server dimulai ulang.</span>
+          )}
+          {probe && probe.ok && !probe.persistent && (
+            <span><strong>Disk lokal.</strong> Di laptop ini aman. Di hosting (AI Studio / Cloud Run) disk dibuang setiap server dimulai ulang — set <code className="font-mono">GCS_BUCKET</code> di sana, atau andalkan cadangan di bawah.</span>
+          )}
+          {probe && !probe.ok && (
+            <span><strong>Penyimpanan GAGAL</strong>{probe.bucket ? <> — bucket <code className="font-mono">{probe.bucket}</code></> : null}: {probe.error}{probe.hint ? <><br /><span className="font-semibold">Perbaikan:</span> {probe.hint}</> : null}</span>
+          )}
+        </div>
+        <button type="button" onClick={runProbe} disabled={probing} title="Periksa ulang" className="shrink-0 p-1 rounded hover:bg-white/60 disabled:opacity-50 cursor-pointer">
+          <RefreshCw className={`w-3.5 h-3.5 ${probing ? 'animate-spin' : ''}`} />
+        </button>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
