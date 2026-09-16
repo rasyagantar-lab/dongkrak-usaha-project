@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
-  Animation policy for this app (see CLAUDE.md, "UI conventions").
+  Animation policy for this app (see DEVELOPMENT_RULES.md, "UI conventions").
   Target hardware is <=8GB-RAM laptops with integrated GPUs, so every animation here
   touches ONLY transform and opacity -- the two properties the compositor can animate
   without layout or paint. No blur, no box-shadow, no width/height transitions.

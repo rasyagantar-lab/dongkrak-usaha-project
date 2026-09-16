@@ -10,4 +10,8 @@ public/base-photos
 public/generated-images
 public/dongkrakusaha-publisher-extension.zip
 *.log
-.claude
+# editor / assistant metadata
+.vscode
+.idea
+.*.local
+.*/

@@ -23,7 +23,7 @@ Setelah mengubah `.env`, matikan proses Node sepenuhnya lalu jalankan lagi (`npm
 Lihat `DEPLOY_CLOUD_RUN.md`. Status: belum pernah di-deploy sungguhan.
 
 ## Dokumen proyek
-- `CLAUDE.md` — aturan kerja pengembang (baca dulu sebelum mengubah apa pun).
+- `DEVELOPMENT_RULES.md` — aturan kerja pengembang (baca dulu sebelum mengubah apa pun).
 - `PROJECT_KNOWLEDGE.md` — kondisi terkini, temuan terverifikasi, keputusan.
 - `AI_MODELS.md` — registri model/provider/key dan aturan bernomor.
 - `ai-agents/*.md` — kontrak tiap agent AI; enam di antaranya dibaca server saat runtime dan ditambahi catatan oleh agent-nya sendiri.

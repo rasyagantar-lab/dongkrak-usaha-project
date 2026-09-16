@@ -325,7 +325,7 @@ Verification (live, no restart between steps):
 2. Changed the sentinel to `...-BETA` on disk. Called again. Response: `brandTone: "KONTRAK-TERBACA-BETA"`. Proves a fresh read every call, no in-memory copy. A second note was appended.
 3. Test artifacts (sentinel + the two notes from fictional test businesses) were removed by restoring the pre-test file, so the log fills from real use only.
 
-Also fixed: `phase2-workflow.md`'s "Required Project Files" omitted itself and made a now-false blanket claim -- rewritten into builder-memory / live-contract / documentation-only groups. `webp-converter.md` never mentioned `/api/image/compose` -- added. All six contracts' "Self-Improvement Rule" sections now describe the real mechanism instead of an aspiration. Root `CLAUDE.md` created so the builder-side read/update discipline loads automatically every session.
+Also fixed: `phase2-workflow.md`'s "Required Project Files" omitted itself and made a now-false blanket claim -- rewritten into builder-memory / live-contract / documentation-only groups. `webp-converter.md` never mentioned `/api/image/compose` -- added. All six contracts' "Self-Improvement Rule" sections now describe the real mechanism instead of an aspiration. Root `DEVELOPMENT_RULES.md` created so the builder-side read/update discipline loads automatically every session.
 
 Known trade-off accepted: contract files mix timeless rules with dated changelog notes that now reach the model verbatim. Low risk (output is schema-constrained) and not worth restructuring six files pre-emptively; revisit if prompts get noticeably long.
 
@@ -393,7 +393,7 @@ What changed:
 - `index.html`: `lang="id"`, real `<title>`, `theme-color`, and an inline-SVG favicon using the same blue badge + globe mark (none existed before).
 - `package.json`: `motion` removed (confirmed zero usages).
 - `src/components/Header.tsx`: the campaign `<select>` could push the page 7px wider than a 400px viewport when a campaign name is long -- a pre-existing bug surfaced by the phone-width check, fixed with `min-w-0`/`max-w-[70vw]`/`truncate`.
-- `CLAUDE.md` "UI conventions" records the Tailwind-only / no-blur / transform-opacity-only policy so a future session does not reintroduce the cost.
+- `DEVELOPMENT_RULES.md` "UI conventions" records the Tailwind-only / no-blur / transform-opacity-only policy so a future session does not reintroduce the cost.
 
 Verification (real headless Chromium, `playwright-chromium`): splash visible on first load with all four credit strings and the title; scrim has no backdrop-filter; page title set; dismisses on "Mulai"; "Kepung Pasar" tab renders its heading; "Buat dengan AI" button present on Visual Aset; splash NOT shown again after a same-session reload; splash shown again in a fresh browser context; no horizontal scroll at 400px (after the header fix); zero page errors. Screenshots reviewed: splash and Kepung Pasar both match the app's slate/blue palette.
 
@@ -492,7 +492,7 @@ Conclusion: after correction, AI Studio's copy is functionally equal to `experim
 
 ### Working arrangement fixed by the user (2026-09-15)
 - Working rules unchanged (read MD before, record after, evidence-first).
-- Claude in this repo = app developer AND debugger. AI Studio = cloud host ONLY. It is not a developer and its edits are never merged back; the repo is the single source of truth and deploys flow one way, repo -> AI Studio.
+- The developer working in this repo = app developer AND debugger. AI Studio = cloud host ONLY. It is not a developer and its edits are never merged back; the repo is the single source of truth and deploys flow one way, repo -> AI Studio.
 - Next: the user will propose the next update tomorrow. The cloud experiment stays open and UNVERIFIED until a `storage=gcs` startup log is seen.
 
 ## Operator Feedback Round 3: slow orchestrator, endless audit loop, quota opacity (2026-09-15)
@@ -591,7 +591,7 @@ Status: PROVEN again, same sentinel method as 2026-09-14, on the current `server
 - Self-improvement writes also confirmed today as a side effect of the Step E test runs: 12 new dated lines landed across campaign-strategy / keyword-strategy / orchestrator / quality-audit (dedupe kept it to 12 across 4 runs).
 
 ## History Rewritten: Co-Author Trailer Removed (2026-09-16)
-The user asked for the Claude co-author line to disappear from the GitHub contributor list. All 13 affected commit MESSAGES on master and experiment/cloud-run were rewritten (trees, authors, dates untouched; verified content-identical) and experiment/cloud-run was force-pushed. Every commit SHA changed as a result: the master checkpoint is now 1171f88 (was 29781fe), experiment head ef65ec6 at the time of the rewrite. Older SHAs quoted in earlier entries (b25c13e, 5e663b5, 22dbe65, f75de33, d0bc279) no longer exist; find those commits by subject instead. Local backup tags backup/before-trailer-strip-* hold the old history. From here on, commits carry no attribution trailer.
+A tool-added co-author trailer had made a second account appear in the GitHub contributor list; the owner asked for it to disappear. All 13 affected commit MESSAGES on master and experiment/cloud-run were rewritten (trees, authors, dates untouched; verified content-identical) and experiment/cloud-run was force-pushed. Every commit SHA changed as a result: the master checkpoint is now 1171f88 (was 29781fe), experiment head ef65ec6 at the time of the rewrite. Older SHAs quoted in earlier entries (b25c13e, 5e663b5, 22dbe65, f75de33, d0bc279) no longer exist; find those commits by subject instead. Local backup tags backup/before-trailer-strip-* hold the old history. From here on, commits carry no attribution trailer.
 
 ## Operator Feedback Round 4: "Orchestrator takes 3-5 minutes" -- Root Cause PROVEN, Fixed (2026-09-16)
 Status: PROVEN by attempt-level evidence (hosted run + 6 local runs); FIXED and VERIFIED under a live Google 503 storm.
@@ -623,7 +623,7 @@ User request: the welcome card should carry an update log, and a "GitHub profile
 
 - Profile URL verified against the GitHub API before use: `https://github.com/kartiniresolusi-source` = "Rasya Kishou", 2 public repos, profile README repo `kartiniresolusi-source/kartiniresolusi-source` exists (branch main).
 - `GET /api/github/profile` (server.ts): fetches the user record and the README already RENDERED by GitHub (`Accept: application/vnd.github.html`) -- no markdown library added. Rewrites the README's relative paths (`./assets/header.png`, `./assets/divider.png` -> raw.githubusercontent.com; `href="./x"` -> the file's GitHub page), strips any `<script>`/inline handlers as belt-and-braces, caches for 1 h in memory, serves the last good copy on failure, 502 with the profile link when there is none. Login overridable via `GITHUB_PROFILE_LOGIN`; optional `GITHUB_TOKEN` raises the 60/h anonymous rate limit (server-side only, never in the client).
-- `src/changelog.ts` (new): `CHANGELOG` entries written for the PKL team in plain Indonesian, newest first, plus `APP_VERSION`. Rule added to CLAUDE.md: every user-visible change ships with an entry.
+- `src/changelog.ts` (new): `CHANGELOG` entries written for the PKL team in plain Indonesian, newest first, plus `APP_VERSION`. Rule added to DEVELOPMENT_RULES.md: every user-visible change ships with an entry.
 - `WelcomeSplash.tsx` rewritten with three tabs: Tentang (steps, credits, and the "Profil GitHub pengembang" block that jumps to the GitHub tab), Log Update (changelog list), Profil GitHub (avatar/name/bio/repo+follower counts + "Buka GitHub" + the README in a 52vh scrollable box styled by `.gh-readme` in index.css). README is fetched lazily only when that tab opens. Card widened to max-w-2xl with an internal scroll area so the footer (Mulai / Jangan tampilkan lagi) stays visible.
 
 Verified: API returns 25.5 KB of HTML with 0 relative paths left and 0 scripts; in the browser all 47 README images loaded (header art, badges, 33 tool icons), the box scrolls (1001 px content in 468 px), headings "About me / Connect with me / Languages and Tools" present; no page errors; 400 px width has no horizontal overflow. Screenshots reviewed for all three tabs.

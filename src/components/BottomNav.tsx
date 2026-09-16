@@ -15,7 +15,7 @@ import { useJobCenter } from '../jobs';
   Bottom tab bar. One blue "bubble" sits under the active tab and glides to the next
   one on click (translateX only, springy easing), then does a small scale bounce as
   it lands. Width changes are applied instantly (no layout animation) -- only
-  transform and opacity ever animate here, per the UI conventions in CLAUDE.md.
+  transform and opacity ever animate here, per the UI conventions in DEVELOPMENT_RULES.md.
   Tabs with a running background job carry a dot badge.
 */
 

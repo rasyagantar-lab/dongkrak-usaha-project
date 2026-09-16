@@ -12,3 +12,8 @@ coverage/
 data/
 public/base-photos/
 public/generated-images/
+
+# Local-only notes and editor metadata (never committed)
+*.local.md
+.vscode/
+.idea/

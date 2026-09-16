@@ -5,7 +5,7 @@ import { Job, useJobCenter, formatElapsed } from '../jobs';
 /*
   Compact progress notifications for background jobs -- one row per job, stacked
   above the bottom navigation. Everything animated here is transform/opacity only
-  (progress bar = scaleX), per the UI conventions in CLAUDE.md.
+  (progress bar = scaleX), per the UI conventions in DEVELOPMENT_RULES.md.
 */
 
 interface JobTrayProps {

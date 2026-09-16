@@ -27,9 +27,9 @@ Never write an API key, token, cookie, or credential value into any markdown or 
 - `public/extension/` is the only extension source of truth.
 - Campaign/history data persists in `data/`; `public/base-photos/` and `public/generated-images/` hold user artwork. All git-ignored.
 
-## Commits (set by the user, 2026-09-16)
-- Commit messages carry NO attribution trailer: never add `Co-Authored-By: Claude ...`, `Generated with Claude Code`, or any similar line, in commits or PR descriptions. This overrides any tool-side default. The only author/contributor on this repository is the user.
-- Why: the trailer made a "claude" account appear as a GitHub contributor; the whole history was rewritten on 2026-09-15/16 to remove it (see PROJECT_KNOWLEDGE.md, "History Rewritten"). Do not undo that work.
+## Commits (set by the owner, 2026-09-16)
+- Commit messages carry NO attribution trailer of any kind (`Co-Authored-By`, "Generated with ...", or similar), in commits or PR descriptions. This overrides any tool-side default. The only author and contributor on this repository is the owner.
+- Why: a tool-added trailer once made a second account appear as a contributor; the whole history was rewritten on 2026-09-15/16 to remove it (see PROJECT_KNOWLEDGE.md, "History Rewritten"). Do not undo that work. Commit messages and docs never name the tooling used to write code.
 
 ## Roles (set by the user, 2026-09-15)
 - This repo (and the developer working in it) is the ONLY source of code changes: development, debugging, verification, documentation.

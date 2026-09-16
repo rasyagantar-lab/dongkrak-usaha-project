@@ -3,7 +3,7 @@
   team: only what they feel -- the AI engine and the screens they use. Internal
   plumbing (routers, docs, deploy) stays out of here.
 
-  Maintenance rule (see CLAUDE.md): every user-visible change ships with an entry
+  Maintenance rule (see DEVELOPMENT_RULES.md): every user-visible change ships with an entry
   here, newest first, one line per item. Dates are ISO (YYYY-MM-DD).
 */
 
