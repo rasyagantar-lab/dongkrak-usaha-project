@@ -616,6 +616,20 @@ Verified (same campaign cmp-001, same hour, Google in a visible 503 storm): 23.1
 
 Not done, deliberately: no hedged parallel requests (would double free-tier quota use), no permanent blacklist of flash-latest (AI_MODELS Rule 4 -- a today-sick alias may be healthy tomorrow; the backoff handles it), no persistence of MODEL_HEALTH (a fresh process should re-probe).
 
+## Welcome Splash v3: Update Log + GitHub Profile With Live README (2026-09-16)
+Status: DONE and VERIFIED (headless Chromium, desktop + 400 px).
+
+User request: the welcome card should carry an update log, and a "GitHub profile" block that, when pressed, shows the developer's profile README as on GitHub -- scrollable, including the "Languages and Tools" icons.
+
+- Profile URL verified against the GitHub API before use: `https://github.com/kartiniresolusi-source` = "Rasya Kishou", 2 public repos, profile README repo `kartiniresolusi-source/kartiniresolusi-source` exists (branch main).
+- `GET /api/github/profile` (server.ts): fetches the user record and the README already RENDERED by GitHub (`Accept: application/vnd.github.html`) -- no markdown library added. Rewrites the README's relative paths (`./assets/header.png`, `./assets/divider.png` -> raw.githubusercontent.com; `href="./x"` -> the file's GitHub page), strips any `<script>`/inline handlers as belt-and-braces, caches for 1 h in memory, serves the last good copy on failure, 502 with the profile link when there is none. Login overridable via `GITHUB_PROFILE_LOGIN`; optional `GITHUB_TOKEN` raises the 60/h anonymous rate limit (server-side only, never in the client).
+- `src/changelog.ts` (new): `CHANGELOG` entries written for the PKL team in plain Indonesian, newest first, plus `APP_VERSION`. Rule added to CLAUDE.md: every user-visible change ships with an entry.
+- `WelcomeSplash.tsx` rewritten with three tabs: Tentang (steps, credits, and the "Profil GitHub pengembang" block that jumps to the GitHub tab), Log Update (changelog list), Profil GitHub (avatar/name/bio/repo+follower counts + "Buka GitHub" + the README in a 52vh scrollable box styled by `.gh-readme` in index.css). README is fetched lazily only when that tab opens. Card widened to max-w-2xl with an internal scroll area so the footer (Mulai / Jangan tampilkan lagi) stays visible.
+
+Verified: API returns 25.5 KB of HTML with 0 relative paths left and 0 scripts; in the browser all 47 README images loaded (header art, badges, 33 tool icons), the box scrolls (1001 px content in 468 px), headings "About me / Connect with me / Languages and Tools" present; no page errors; 400 px width has no horizontal overflow. Screenshots reviewed for all three tabs.
+
+Note: the README's header image is a 1.2 MB PNG served from raw.githubusercontent.com; it is the user's own asset and loads only when the GitHub tab is opened.
+
 ## Roadmap Completion Summary (2026-09-14)
 All four phases of the approved plan are implemented. Evidence status per phase:
 - Phase 1 MD contracts: PROVEN (sentinel twice, notes on disk, then real notes from a production siege run).

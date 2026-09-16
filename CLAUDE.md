@@ -41,4 +41,5 @@ Never write an API key, token, cookie, or credential value into any markdown or 
 - Animate only `transform` and `opacity`. No `backdrop-filter: blur()`. Target hardware is ≤8GB-RAM laptops with integrated GPUs.
 - Navigation is the bottom bar (`BottomNav.tsx`); the header has no tabs. Fixed bottom-anchored widgets must offset by `--du-bottom-nav` (`.du-above-nav` / `.du-tray`), never hard-code `bottom-4`.
 - Every tab stays mounted (`TabPanel` in App.tsx); never reintroduce a tab-keyed remount. Long-running work goes through the Job Center (`src/jobs.tsx`, `startJob`), not panel-local state, so it survives tab and campaign switches and shows in the job tray.
+- Every user-visible change gets an entry in `src/changelog.ts` (shown in the welcome splash's "Log Update" tab), written for the PKL team in plain Indonesian, newest first; bump `APP_VERSION` there when the header badge should change.
 - `vite.config.ts` ignores `ai-agents/`, `data/`, `*.md` and generated images in the watcher. Runtime writes to those paths used to full-reload the page mid-run. Keep that list intact.

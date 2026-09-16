@@ -641,6 +641,61 @@ async function generateWithFallback(options: { feature?: FeatureName, contents: 
 // ------------------- API ROUTES -------------------
 
 // 1. Health check
+// ---- Developer's GitHub profile for the welcome splash ----
+// The splash shows the developer's profile README exactly as GitHub renders it.
+// GitHub does the markdown -> HTML rendering (Accept: application/vnd.github.html),
+// this route only proxies it (browser -> GitHub would hit CORS + the 60/h anonymous
+// rate limit per viewer), rewrites the README's relative asset paths to raw URLs,
+// and caches the result for an hour. On a fetch failure the last good copy is
+// served; if there is none, the client falls back to a static card.
+const GITHUB_PROFILE_LOGIN = process.env.GITHUB_PROFILE_LOGIN || "kartiniresolusi-source";
+const GITHUB_PROFILE_TTL_MS = 60 * 60 * 1000;
+let githubProfileCache: { fetchedAt: number; payload: any } | null = null;
+
+app.get("/api/github/profile", async (req, res) => {
+  const now = Date.now();
+  if (githubProfileCache && now - githubProfileCache.fetchedAt < GITHUB_PROFILE_TTL_MS) {
+    return res.json({ ...githubProfileCache.payload, cached: true });
+  }
+  const login = GITHUB_PROFILE_LOGIN;
+  const headers: Record<string, string> = { "User-Agent": "DongkrakUsaha-AI-Publisher", ...(process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}) };
+  try {
+    const [userRes, readmeRes] = await Promise.all([
+      fetch(`https://api.github.com/users/${login}`, { headers, signal: AbortSignal.timeout(10_000) }),
+      fetch(`https://api.github.com/repos/${login}/${login}/readme`, { headers: { ...headers, Accept: "application/vnd.github.html" }, signal: AbortSignal.timeout(10_000) })
+    ]);
+    if (!userRes.ok) throw new Error(`GitHub users API ${userRes.status}`);
+    const user: any = await userRes.json();
+    let readmeHtml = readmeRes.ok ? await readmeRes.text() : "";
+    const branch = "main";
+    // ./assets/x.png -> raw file; ./x -> the file's page on GitHub.
+    readmeHtml = readmeHtml
+      .replace(/src="\.\/([^"]+)"/g, `src="https://raw.githubusercontent.com/${login}/${login}/${branch}/$1"`)
+      .replace(/href="\.\/([^"]+)"/g, `href="https://github.com/${login}/${login}/blob/${branch}/$1"`)
+      // Belt and braces: the rendered README should never carry executable content.
+      .replace(/<script[\s\S]*?<\/script>/gi, "")
+      .replace(/\son[a-z]+="[^"]*"/gi, "");
+    const payload = {
+      login: user.login,
+      name: user.name,
+      bio: user.bio,
+      avatarUrl: user.avatar_url,
+      htmlUrl: user.html_url,
+      publicRepos: user.public_repos,
+      followers: user.followers,
+      following: user.following,
+      readmeHtml,
+      fetchedAt: new Date(now).toISOString()
+    };
+    githubProfileCache = { fetchedAt: now, payload };
+    res.json({ ...payload, cached: false });
+  } catch (err: any) {
+    console.warn("[GitHub profile] fetch failed:", err?.message);
+    if (githubProfileCache) return res.json({ ...githubProfileCache.payload, cached: true, stale: true });
+    res.status(502).json({ error: "Profil GitHub tidak bisa diambil saat ini.", detail: String(err?.message || err).slice(0, 200), htmlUrl: `https://github.com/${login}` });
+  }
+});
+
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
