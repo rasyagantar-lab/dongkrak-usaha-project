@@ -555,7 +555,7 @@ Verified end-to-end (Playwright, headless): start run on cmp-001 -> switch to Da
 Not moved to the Job Center (deliberately): the publishing hub's extension autopost. Its submit-result listener already lives at the App root (see "Autopost Publish Finalization Listener" bug), and the hub now stays mounted anyway.
 
 ## Feature - One Click To DongkrakUsaha's "Input Produk" Form (2026-09-15)
-Status: FIXED BUT UNVERIFIED on the real site (needs the operator's logged-in session). Finder logic PROVEN on synthetic pages.
+Status: VERIFIED on the real site by the operator (2026-09-16). First attempt "did not work" because the browser still ran extension 1.0.0; after loading the 1.1.0 zip the button opened the real entry form. Landed URL not recorded yet -- capture it from the status line on a later run. Finder logic PROVEN on synthetic pages.
 
 User report: "Buka halaman input produk" in the Publish tab lands on the product LIST, not the entry form; asked for a feature that presses DongkrakUsaha's own "Input Produk" button.
 
