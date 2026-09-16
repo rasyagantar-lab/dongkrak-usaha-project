@@ -33,7 +33,7 @@ Never write an API key, token, cookie, or credential value into any markdown or 
 - Deploy direction is one-way: repo -> AI Studio. Verify each deploy by its `[Startup]` log lines, never by AI Studio's own claims.
 
 ## Branches (as of 2026-09-14)
-- `master` = proven local/LAN state (checkpoint `29781fe`). `experiment/cloud-run` = Cloud Run hosting experiment, UNVERIFIED. Do not merge the experiment into master without a successful real deploy and the user's say-so. Read the "EXPERIMENT" section in PROJECT_KNOWLEDGE.md before touching either.
+- `master` = proven local/LAN state (checkpoint `1171f88`). `experiment/cloud-run` = Cloud Run hosting experiment, UNVERIFIED. Do not merge the experiment into master without a successful real deploy and the user's say-so. Read the "EXPERIMENT" section in PROJECT_KNOWLEDGE.md before touching either.
 - Storage mode is decided solely by the `GCS_BUCKET` env var (`server/storage.ts`): absent = local disk, exactly as master behaves.
 
 ## UI conventions

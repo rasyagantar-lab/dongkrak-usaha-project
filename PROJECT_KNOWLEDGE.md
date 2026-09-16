@@ -429,7 +429,7 @@ Status: IN PROGRESS, UNVERIFIED. Nothing in this section is proven until stated 
 Why: the user wants to try hosting the app so 4 PKL interns + a supervisor can use it from anywhere, and proposed handing the repo to AI Studio to deploy. Concerns the user raised, in their words: the deploying AI must not modify the files; will the API keys (especially the non-Google Cloudflare key) be a problem.
 
 Rollback (the whole point of this section):
-- `master` is commit `29781fe` = the proven local/LAN state (MD contracts live, market siege, Cloudflare base photo proven, splash, persistence, operator-feedback fixes). `git checkout master` returns to it. Nothing on the experiment branch is merged unless a real deploy succeeds AND the user says so.
+- `master` is commit `1171f88` = the proven local/LAN state (MD contracts live, market siege, Cloudflare base photo proven, splash, persistence, operator-feedback fixes). `git checkout master` returns to it. Nothing on the experiment branch is merged unless a real deploy succeeds AND the user says so.
 - `.env`, `data/`, `public/base-photos/`, `public/generated-images/` are git-ignored, so switching branches never touches campaigns, keys, or photos.
 - The experiment adds a storage layer (`server/storage.ts`) that stays in LOCAL mode unless `GCS_BUCKET` is set. With that variable absent, every code path is intended to behave exactly as on `master`; this is re-verified locally before any deploy (see verification below once done).
 
@@ -462,7 +462,7 @@ NOT VERIFIED (cannot be, from this machine):
 - Whether the user's GCP project can enable billing at all (external blocker).
 - Design caveat to remember: in gcs mode the self-improvement log lives in the bucket and the RULES come from the image; editing `ai-agents/*.md` requires a redeploy to take effect. Documented in DEPLOY_CLOUD_RUN.md.
 
-Rollback: `git checkout master` (checkpoint `29781fe`). Local data untouched. ONE CAVEAT: the agents keep appending self-improvement notes to `ai-agents/*.md` while the experiment branch is checked out (they are committed there). A plain checkout of master would revert those files and drop notes added since the checkpoint. To keep them: `git checkout master && git checkout experiment/cloud-run -- ai-agents/ && git commit -m "carry agent notes"`.
+Rollback: `git checkout master` (checkpoint `1171f88`). Local data untouched. ONE CAVEAT: the agents keep appending self-improvement notes to `ai-agents/*.md` while the experiment branch is checked out (they are committed there). A plain checkout of master would revert those files and drop notes added since the checkpoint. To keep them: `git checkout master && git checkout experiment/cloud-run -- ai-agents/ && git commit -m "carry agent notes"`.
 
 ### Finding: AI Studio DID modify the repo despite the do-not-modify notices (2026-09-14, evening)
 Method: the user uploaded a zip of `experiment/cloud-run` to AI Studio, deployed, and exported AI Studio's copy as a zip. Both zips were extracted OUTSIDE the repo (scratch folder) and diffed file by file. Nothing from AI Studio's copy was merged.
@@ -589,6 +589,9 @@ Status: PROVEN again, same sentinel method as 2026-09-14, on the current `server
 - Changed the marker to KOALA-2026 on disk, called again, still no restart: response began with `KOALA-2026`, ZEBRA gone. So the contract is read fresh on every call, not cached at boot.
 - Contract restored from backup; no sentinel text remains in the repo.
 - Self-improvement writes also confirmed today as a side effect of the Step E test runs: 12 new dated lines landed across campaign-strategy / keyword-strategy / orchestrator / quality-audit (dedupe kept it to 12 across 4 runs).
+
+## History Rewritten: Co-Author Trailer Removed (2026-09-16)
+The user asked for the Claude co-author line to disappear from the GitHub contributor list. All 13 affected commit MESSAGES on master and experiment/cloud-run were rewritten (trees, authors, dates untouched; verified content-identical) and experiment/cloud-run was force-pushed. Every commit SHA changed as a result: the master checkpoint is now 1171f88 (was 29781fe), experiment head ef65ec6 at the time of the rewrite. Older SHAs quoted in earlier entries (b25c13e, 5e663b5, 22dbe65, f75de33, d0bc279) no longer exist; find those commits by subject instead. Local backup tags backup/before-trailer-strip-* hold the old history. From here on, commits carry no attribution trailer.
 
 ## Roadmap Completion Summary (2026-09-14)
 All four phases of the approved plan are implemented. Evidence status per phase:
