@@ -25,7 +25,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       'AI Orchestrator ±23 detik (sebelumnya 2–5 menit); saat Google sedang bermasalah tetap di bawah 1,5 menit.',
       'Task Ledger memperlihatkan model mana yang dicoba dan berapa lama — jelas kenapa sebuah tahap lambat.',
       'Koneksi → Cadangan Data: unduh semua campaign + riwayat ke satu file, pulihkan kapan saja.',
-      'Kartu pengenalan: tab Log Update dan Profil GitHub.'
+      'Kartu pengenalan baru: dua panel — pengenalan + profil GitHub pengembang (README bisa dibuka di tempat) dan Log Update.'
     ]
   },
   {

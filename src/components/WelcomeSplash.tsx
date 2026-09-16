@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { Globe, ArrowRight, Building2, Workflow, Send, Github, ExternalLink, History, RefreshCw, ChevronRight } from 'lucide-react';
+import { Globe, ArrowRight, Building2, Workflow, Send, Github, ExternalLink, History, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 import { CHANGELOG, APP_VERSION } from '../changelog';
 
 /*
-  Welcome splash, third version (2026-09-16). Three tabs:
-  - Tentang: what the app does, credits, and a block that opens the GitHub profile.
-  - Log Update: the changelog from src/changelog.ts, scrollable.
-  - Profil GitHub: the developer's profile card + their profile README exactly as
-    GitHub renders it (fetched through /api/github/profile, scrollable, includes the
-    "Languages and Tools" icons). Falls back to a static card if the fetch fails.
+  Welcome splash, fourth version (2026-09-17): one wide dialog, two panes.
+  - Left ("Tentang"): what the app does, credits, and the developer's GitHub card.
+    The card itself expands in place to show the profile README exactly as GitHub
+    renders it (fetched through /api/github/profile, scrollable, includes the
+    "Languages and Tools" icons). No separate tab -- the owner asked for one place.
+  - Right ("Log Update"): the changelog from src/changelog.ts, scrollable.
+  On phones the panes stack. Falls back to a static GitHub card if the fetch fails.
 
   Animation policy unchanged: transform/opacity only, no blur, motion-reduce gated.
   Shown once per browser session; "Jangan tampilkan lagi" turns it off on this
@@ -27,12 +28,10 @@ const writeFlag = (store: 'session' | 'local', key: string) => {
 };
 
 const STEPS = [
-  { icon: Building2, text: 'Isi data bisnis sekali' },
-  { icon: Workflow, text: 'AI menyusun strategi, konten, dan audit' },
-  { icon: Send, text: 'Terbitkan ke DongkrakUsaha lewat ekstensi' }
+  { icon: Building2, title: 'Isi data bisnis', text: 'Sekali saja: nama, layanan, WhatsApp, alamat, kota.' },
+  { icon: Workflow, title: 'AI bekerja', text: 'Strategi, keyword, konten, audit kualitas, dan konsep gambar — otomatis.' },
+  { icon: Send, title: 'Terbitkan', text: 'Ekstensi Chrome mengisi form DongkrakUsaha untuk Anda.' }
 ];
-
-type SplashTab = 'about' | 'changelog' | 'github';
 
 interface GithubProfile {
   login: string;
@@ -47,14 +46,15 @@ interface GithubProfile {
   stale?: boolean;
 }
 
-const GITHUB_URL = 'https://github.com/kartiniresolusi-source';
+const GITHUB_LOGIN = 'rasyagantar-lab';
+const GITHUB_URL = `https://github.com/${GITHUB_LOGIN}`;
 
 export const WelcomeSplash: React.FC = () => {
   const [visible, setVisible] = useState(false);
   const [closing, setClosing] = useState(false);
   const [never, setNever] = useState(false);
-  const [tab, setTab] = useState<SplashTab>('about');
 
+  const [readmeOpen, setReadmeOpen] = useState(false);
   const [profile, setProfile] = useState<GithubProfile | null>(null);
   const [profileState, setProfileState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
 
@@ -70,10 +70,10 @@ export const WelcomeSplash: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, never]);
 
-  // The README is only fetched when the GitHub tab is opened -- most sessions never
-  // need it, and it is the heaviest thing on this screen.
+  // The README is fetched only when the card is expanded -- it is the heaviest
+  // thing on this screen and most sessions never open it.
   useEffect(() => {
-    if (tab !== 'github' || profileState !== 'idle') return;
+    if (!readmeOpen || profileState !== 'idle') return;
     setProfileState('loading');
     fetch('/api/github/profile')
       .then(async res => {
@@ -83,7 +83,7 @@ export const WelcomeSplash: React.FC = () => {
         setProfileState('ready');
       })
       .catch(() => setProfileState('error'));
-  }, [tab, profileState]);
+  }, [readmeOpen, profileState]);
 
   const dismiss = () => {
     if (closing) return;
@@ -99,13 +99,7 @@ export const WelcomeSplash: React.FC = () => {
   if (!visible) return null;
 
   // Each block rises slightly after the previous one.
-  const rise = (i: number): React.CSSProperties => ({ animationDelay: `${100 + i * 80}ms` });
-
-  const TABS: { id: SplashTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-    { id: 'about', label: 'Tentang', icon: Globe },
-    { id: 'changelog', label: 'Log Update', icon: History },
-    { id: 'github', label: 'Profil GitHub', icon: Github }
-  ];
+  const rise = (i: number): React.CSSProperties => ({ animationDelay: `${100 + i * 70}ms` });
 
   return (
     <div
@@ -120,110 +114,139 @@ export const WelcomeSplash: React.FC = () => {
     >
       <div
         onClick={e => e.stopPropagation()}
-        className={`relative w-full max-w-3xl max-h-[94vh] flex flex-col bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden motion-reduce:animate-none ${
+        className={`relative w-full max-w-5xl max-h-[94vh] flex flex-col bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden motion-reduce:animate-none ${
           closing ? 'animate-du-scale-out' : 'animate-du-scale-in'
         }`}
       >
-        {/* Soft backdrop: static gradient + two blobs, no filters. */}
-        <div aria-hidden="true" className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-blue-50 via-white to-white pointer-events-none" />
-        <div aria-hidden="true" className="absolute -top-16 -right-16 w-56 h-56 rounded-full bg-blue-100/70 pointer-events-none" />
-        <div aria-hidden="true" className="absolute -top-6 -left-20 w-48 h-48 rounded-full bg-violet-100/60 pointer-events-none" />
-
-        {/* Header: mark + title + tabs */}
-        <div className="relative px-6 sm:px-7 pt-6 pb-3">
-          <div className="flex items-start gap-4 animate-du-rise motion-reduce:animate-none" style={rise(0)}>
-            <div className="w-16 h-16 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md shrink-0 animate-du-breathe motion-reduce:animate-none">
+        {/* Brand band */}
+        <div className="relative shrink-0 px-6 sm:px-8 pt-6 pb-5 bg-gradient-to-r from-blue-600 via-blue-600 to-violet-600 text-white overflow-hidden">
+          <div aria-hidden="true" className="absolute -top-20 -right-16 w-64 h-64 rounded-full bg-white/10 pointer-events-none" />
+          <div aria-hidden="true" className="absolute -bottom-24 left-1/3 w-56 h-56 rounded-full bg-white/10 pointer-events-none" />
+          <div className="relative flex items-center gap-4 animate-du-rise motion-reduce:animate-none" style={rise(0)}>
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white/15 border border-white/25 flex items-center justify-center shrink-0 animate-du-breathe motion-reduce:animate-none">
               <Globe className="w-8 h-8" />
             </div>
             <div className="min-w-0">
-              <div className="text-3xs font-semibold text-blue-600 uppercase tracking-[0.2em]">DongkrakUsaha · v{APP_VERSION}</div>
-              <h1 id="du-splash-title" className="text-2xl sm:text-3xl font-bold text-slate-900 leading-tight tracking-tight mt-0.5">
+              <div className="text-3xs font-semibold text-blue-100 uppercase tracking-[0.2em]">DongkrakUsaha · v{APP_VERSION}</div>
+              <h1 id="du-splash-title" className="text-2xl sm:text-3xl font-bold leading-tight tracking-tight mt-0.5">
                 AI Marketing Suite
               </h1>
-              <p className="text-sm sm:text-base text-slate-500 mt-1 leading-relaxed">
+              <p className="text-sm sm:text-base text-blue-100 mt-1 leading-relaxed">
                 Satu bisnis, seluruh wilayah — dari data bisnis sampai listing terbit.
               </p>
             </div>
           </div>
-
-          <div className="mt-4 flex gap-1 bg-slate-100 p-1 rounded-xl animate-du-rise motion-reduce:animate-none" style={rise(1)}>
-            {TABS.map(t => {
-              const Icon = t.icon;
-              const active = tab === t.id;
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => setTab(t.id)}
-                  className={`flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-sm font-semibold transition-colors cursor-pointer ${
-                    active ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  {t.label}
-                </button>
-              );
-            })}
-          </div>
         </div>
 
-        {/* Body: scrolls when content is tall (changelog, README). */}
-        <div className="relative flex-1 min-h-0 overflow-y-auto px-6 sm:px-7 pb-2">
-          {tab === 'about' && (
-            <div key="about" className="space-y-4">
-              <ul className="space-y-2">
+        {/* Two panes; stacked on phones. Each pane scrolls on its own. */}
+        <div className="relative flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] overflow-y-auto lg:overflow-hidden">
+          {/* LEFT: about + credits + GitHub */}
+          <section className="lg:overflow-y-auto px-6 sm:px-8 py-5 space-y-5 lg:border-r border-slate-100">
+            <div>
+              <div className="text-3xs font-semibold text-slate-400 uppercase tracking-wider mb-2 animate-du-rise motion-reduce:animate-none" style={rise(1)}>Cara kerja</div>
+              <ol className="space-y-2.5">
                 {STEPS.map((s, i) => {
                   const Icon = s.icon;
                   return (
-                    <li key={s.text} className="flex items-center gap-3 text-base text-slate-700 animate-du-rise motion-reduce:animate-none" style={rise(2 + i)}>
-                      <span className="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
-                        <Icon className="w-3.5 h-3.5" />
+                    <li key={s.title} className="flex items-start gap-3 animate-du-rise motion-reduce:animate-none" style={rise(2 + i)}>
+                      <span className="w-9 h-9 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center shrink-0 font-bold text-sm">
+                        <Icon className="w-4 h-4" />
                       </span>
-                      <span>{s.text}</span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-bold text-slate-900 leading-tight">{i + 1}. {s.title}</span>
+                        <span className="block text-xs text-slate-500 mt-0.5 leading-relaxed">{s.text}</span>
+                      </span>
                     </li>
                   );
                 })}
-              </ul>
+              </ol>
+            </div>
 
-              <div className="grid grid-cols-2 gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-3.5 animate-du-rise motion-reduce:animate-none" style={rise(5)}>
-                <div className="min-w-0">
-                  <div className="text-3xs font-semibold text-slate-400 uppercase tracking-wider">Dikembangkan oleh</div>
-                  <div className="text-sm font-bold text-slate-900 leading-tight mt-0.5">Muhamad Rasya Ramadhan</div>
-                  <div className="text-2xs text-slate-500 mt-0.5">Siswa PKL · SMK Yadika 5</div>
-                </div>
-                <div className="min-w-0 border-l border-slate-200 pl-3">
-                  <div className="text-3xs font-semibold text-slate-400 uppercase tracking-wider">Pembimbing</div>
-                  <div className="text-sm font-bold text-slate-900 leading-tight mt-0.5">Aceng Komarudin</div>
-                </div>
+            <div className="grid grid-cols-2 gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-3.5 animate-du-rise motion-reduce:animate-none" style={rise(5)}>
+              <div className="min-w-0">
+                <div className="text-3xs font-semibold text-slate-400 uppercase tracking-wider">Dikembangkan oleh</div>
+                <div className="text-sm font-bold text-slate-900 leading-tight mt-0.5">Muhamad Rasya Ramadhan</div>
+                <div className="text-2xs text-slate-500 mt-0.5">Siswa PKL · SMK Yadika 5</div>
               </div>
+              <div className="min-w-0 border-l border-slate-200 pl-3">
+                <div className="text-3xs font-semibold text-slate-400 uppercase tracking-wider">Pembimbing</div>
+                <div className="text-sm font-bold text-slate-900 leading-tight mt-0.5">Aceng Komarudin</div>
+              </div>
+            </div>
 
-              {/* The block the user asked for: press it to see the GitHub profile + README. */}
+            {/* GitHub card: link + README expander, all in one place. */}
+            <div className="rounded-2xl border border-slate-200 overflow-hidden animate-du-rise motion-reduce:animate-none" style={rise(6)}>
+              <div className="flex items-center gap-3 p-3.5 bg-white">
+                <img
+                  src={profile?.avatarUrl || `${GITHUB_URL}.png?size=96`}
+                  alt=""
+                  width={48}
+                  height={48}
+                  className="w-12 h-12 rounded-full border border-slate-200 bg-slate-50 shrink-0"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 text-sm font-bold text-slate-900 leading-tight">
+                    <Github className="w-4 h-4 text-slate-700 shrink-0" />
+                    <span className="truncate">{profile?.name || 'Rasya Kishou'}</span>
+                  </div>
+                  <div className="text-2xs text-slate-500 truncate">
+                    github.com/{profile?.login || GITHUB_LOGIN}{profile?.bio ? ` · ${profile.bio}` : ''}
+                  </div>
+                </div>
+                <a
+                  href={profile?.htmlUrl || GITHUB_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shrink-0"
+                >
+                  Buka <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
               <button
                 type="button"
-                onClick={() => setTab('github')}
-                className="w-full text-left flex items-center gap-3 rounded-2xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 p-3.5 transition-colors cursor-pointer animate-du-rise motion-reduce:animate-none"
-                style={rise(6)}
+                onClick={() => setReadmeOpen(o => !o)}
+                aria-expanded={readmeOpen}
+                className="w-full flex items-center justify-between gap-2 px-3.5 py-2 bg-slate-50 border-t border-slate-200 text-2xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 cursor-pointer"
               >
-                <span className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0">
-                  <Github className="w-4.5 h-4.5" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-bold text-slate-900">Profil GitHub pengembang</span>
-                  <span className="block text-2xs text-slate-500 truncate">github.com/kartiniresolusi-source — lihat README profil, tools yang dipakai, dan repo proyek ini</span>
-                </span>
-                <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+                <span>{readmeOpen ? 'Tutup README profil' : 'Lihat README profil — tools yang dipakai & cara menghubungi'}</span>
+                {readmeOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
               </button>
+              {readmeOpen && (
+                <div className="border-t border-slate-200 animate-du-fade-in motion-reduce:animate-none">
+                  {profileState === 'loading' && (
+                    <div className="flex items-center gap-2 text-xs text-slate-500 py-6 justify-center">
+                      <RefreshCw className="w-4 h-4 animate-spin" /> Memuat README dari GitHub...
+                    </div>
+                  )}
+                  {profileState === 'error' && (
+                    <div className="text-xs text-slate-500 p-3 text-center">
+                      README tidak bisa dimuat sekarang (offline atau GitHub membatasi). Buka lewat tombol di atas.
+                    </div>
+                  )}
+                  {profileState === 'ready' && profile?.readmeHtml && (
+                    /* Rendered by GitHub, proxied and sanitised by our server. Scrolls inside. */
+                    <div className="gh-readme max-h-[48vh] overflow-y-auto p-4" dangerouslySetInnerHTML={{ __html: profile.readmeHtml }} />
+                  )}
+                  {profileState === 'ready' && !profile?.readmeHtml && (
+                    <div className="text-xs text-slate-500 p-3 text-center">Profil ini belum punya README.</div>
+                  )}
+                </div>
+              )}
             </div>
-          )}
+          </section>
 
-          {tab === 'changelog' && (
-            <div key="changelog" className="space-y-3 animate-du-fade-in motion-reduce:animate-none">
+          {/* RIGHT: update log */}
+          <section className="lg:overflow-y-auto px-6 sm:px-8 py-5 bg-slate-50/60">
+            <div className="flex items-center gap-2 text-3xs font-semibold text-slate-400 uppercase tracking-wider mb-3 animate-du-rise motion-reduce:animate-none" style={rise(2)}>
+              <History className="w-3.5 h-3.5" /> Log Update
+            </div>
+            <div className="space-y-3">
               {CHANGELOG.map((entry, i) => (
-                <div key={entry.version} className="rounded-2xl border border-slate-200 p-3.5">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className={`text-3xs font-bold px-1.5 py-0.5 rounded ${i === 0 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}>v{entry.version}</span>
-                      <span className="text-sm font-bold text-slate-900 truncate">{entry.title}</span>
+                <div key={entry.version} className="rounded-2xl border border-slate-200 bg-white p-3.5 animate-du-rise motion-reduce:animate-none" style={rise(3 + i)}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-2 min-w-0">
+                      <span className={`text-3xs font-bold px-1.5 py-0.5 rounded shrink-0 mt-0.5 ${i === 0 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}>v{entry.version}</span>
+                      <span className="text-sm font-bold text-slate-900 leading-snug">{entry.title}</span>
                     </div>
                     <span className="text-3xs text-slate-400 shrink-0">{entry.date}</span>
                   </div>
@@ -238,75 +261,16 @@ export const WelcomeSplash: React.FC = () => {
                 </div>
               ))}
             </div>
-          )}
-
-          {tab === 'github' && (
-            <div key="github" className="space-y-3 animate-du-fade-in motion-reduce:animate-none">
-              {/* Profile card: from the API when available, static otherwise. */}
-              <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-3.5">
-                <img
-                  src={profile?.avatarUrl || `${GITHUB_URL}.png?size=96`}
-                  alt=""
-                  width={56}
-                  height={56}
-                  className="w-14 h-14 rounded-full border border-slate-200 bg-white shrink-0"
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-bold text-slate-900 leading-tight">{profile?.name || 'Rasya Kishou'}</div>
-                  <div className="text-2xs text-slate-500 truncate">@{profile?.login || 'kartiniresolusi-source'}{profile?.bio ? ` · ${profile.bio}` : ''}</div>
-                  {profile && (
-                    <div className="text-3xs text-slate-400 mt-1">
-                      {profile.publicRepos ?? 0} repo · {profile.followers ?? 0} pengikut{profile.stale ? ' · data tersimpan' : ''}
-                    </div>
-                  )}
-                </div>
-                <a
-                  href={profile?.htmlUrl || GITHUB_URL}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shrink-0"
-                >
-                  Buka GitHub <ExternalLink className="w-3.5 h-3.5" />
-                </a>
-              </div>
-
-              {profileState === 'loading' && (
-                <div className="flex items-center gap-2 text-xs text-slate-500 py-6 justify-center">
-                  <RefreshCw className="w-4 h-4 animate-spin" /> Memuat README profil dari GitHub...
-                </div>
-              )}
-              {profileState === 'error' && (
-                <div className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
-                  README profil tidak bisa dimuat sekarang (offline atau GitHub membatasi). Buka langsung lewat tombol di atas.
-                </div>
-              )}
-              {profileState === 'ready' && profile?.readmeHtml && (
-                <div className="rounded-2xl border border-slate-200 overflow-hidden">
-                  <div className="px-3.5 py-2 bg-slate-50 border-b border-slate-200 text-3xs font-semibold text-slate-500 uppercase tracking-wider">
-                    README profil · tampil persis seperti di GitHub
-                  </div>
-                  {/* Rendered by GitHub, proxied and sanitised by our server (no scripts,
-                      no inline handlers). Scrolls inside the card. */}
-                  <div
-                    className="gh-readme max-h-[58vh] overflow-y-auto p-4 sm:p-5"
-                    dangerouslySetInnerHTML={{ __html: profile.readmeHtml }}
-                  />
-                </div>
-              )}
-              {profileState === 'ready' && !profile?.readmeHtml && (
-                <div className="text-xs text-slate-500 text-center py-4">Profil ini belum punya README.</div>
-              )}
-            </div>
-          )}
+          </section>
         </div>
 
-        {/* Footer: action + opt-out */}
-        <div className="relative px-6 sm:px-7 py-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center gap-3 bg-white">
+        {/* Footer */}
+        <div className="relative shrink-0 px-6 sm:px-8 py-4 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center gap-3 bg-white">
           <button
             type="button"
             onClick={dismiss}
             autoFocus
-            className="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white text-base font-semibold rounded-xl px-4 py-3.5 transition-colors transition-transform motion-reduce:transition-none cursor-pointer"
+            className="sm:w-64 inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white text-base font-semibold rounded-xl px-4 py-3 transition-colors transition-transform motion-reduce:transition-none cursor-pointer"
           >
             Mulai
             <ArrowRight className="w-4 h-4" />
@@ -320,6 +284,7 @@ export const WelcomeSplash: React.FC = () => {
             />
             Jangan tampilkan lagi
           </label>
+          <span className="sm:ml-auto text-3xs text-slate-400">Esc atau klik di luar untuk menutup</span>
         </div>
       </div>
     </div>

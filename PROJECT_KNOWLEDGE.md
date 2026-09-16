@@ -642,6 +642,18 @@ Safety net that works on any hosting (this session):
 
 Also in this batch: splash card enlarged (max-w-3xl, bigger title/tabs/steps, README box 58vh) after "kurang besar"; changelog cut to engine + audience-facing UI only, per the user ("jangan semua diceritain").
 
+## Repository Moved To A New Account; Splash v4 (2026-09-17)
+Status: DONE and VERIFIED via the GitHub API and headless Chromium.
+
+Repository:
+- New home: `https://github.com/rasyagantar-lab/dongkrak-usaha-project` (branches `experiment/cloud-run` = default, `master`). A fresh repo was chosen over "Transfer ownership" so no unreachable objects or cached contributor data could follow.
+- History was rebuilt twice with plumbing (`commit-tree`; trees/dates preserved): first to scrub the old rules-file name from two messages, then to set author+committer to the owner's new identity. Verified on the new repo: 22 commits, contributors = `rasyagantar-lab` only, 0 tool mentions in messages or tracked files. Local git identity switched; `origin` = new repo, `old-origin` kept only until the old repository is deleted.
+- Working-rules file renamed `CLAUDE.md` -> `DEVELOPMENT_RULES.md`; a git-ignored local pointer loads it for the assistant. Rule (DEVELOPMENT_RULES.md, "Commits"): no attribution trailers, and neither commits nor tracked files name the tooling.
+
+Splash v4 (`WelcomeSplash.tsx`): one wide two-pane dialog. Left = how it works (3 steps), credits, and the developer's GitHub card (`rasyagantar-lab`) that expands IN PLACE to the profile README (no separate tab, per the owner). Right = Log Update. Panes scroll independently on desktop, stack on phones; header/footer fixed height.
+- `/api/github/profile` now defaults to `rasyagantar-lab` and HEAD-checks the README's relative assets, dropping images whose file is missing in the profile repo instead of rendering broken ones. Observed: `assets/divider.png` is not yet in the new profile repo -> 4 uses dropped; 43/43 remaining images load, "Languages and Tools" present. Once the owner copies `assets/divider.png` over, it appears without a code change.
+- Verified: API login/name correct; README 24 KB, 0 relative paths left; browser: 43 images loaded, 0 broken, box scrolls; 400 px width has no overflow; no page errors.
+
 ## Roadmap Completion Summary (2026-09-14)
 All four phases of the approved plan are implemented. Evidence status per phase:
 - Phase 1 MD contracts: PROVEN (sentinel twice, notes on disk, then real notes from a production siege run).

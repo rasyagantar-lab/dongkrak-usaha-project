@@ -648,7 +648,7 @@ async function generateWithFallback(options: { feature?: FeatureName, contents: 
 // rate limit per viewer), rewrites the README's relative asset paths to raw URLs,
 // and caches the result for an hour. On a fetch failure the last good copy is
 // served; if there is none, the client falls back to a static card.
-const GITHUB_PROFILE_LOGIN = process.env.GITHUB_PROFILE_LOGIN || "kartiniresolusi-source";
+const GITHUB_PROFILE_LOGIN = process.env.GITHUB_PROFILE_LOGIN || "rasyagantar-lab";
 const GITHUB_PROFILE_TTL_MS = 60 * 60 * 1000;
 let githubProfileCache: { fetchedAt: number; payload: any } | null = null;
 
@@ -668,7 +668,24 @@ app.get("/api/github/profile", async (req, res) => {
     const user: any = await userRes.json();
     let readmeHtml = readmeRes.ok ? await readmeRes.text() : "";
     const branch = "main";
-    // ./assets/x.png -> raw file; ./x -> the file's page on GitHub.
+    // ./assets/x.png -> raw file; ./x -> the file's page on GitHub. A relative image
+    // whose file is missing in the profile repo (assets folder not copied over) is
+    // dropped rather than rendered as a broken picture.
+    const relImgs = [...new Set([...readmeHtml.matchAll(/src="\.\/([^"]+)"/g)].map(m => m[1]))];
+    const missing = new Set<string>();
+    await Promise.all(relImgs.map(async rel => {
+      try {
+        const r = await fetch(`https://raw.githubusercontent.com/${login}/${login}/${branch}/${rel}`, { method: "HEAD", signal: AbortSignal.timeout(6000) });
+        if (!r.ok) missing.add(rel);
+      } catch { missing.add(rel); }
+    }));
+    for (const rel of missing) {
+      const esc = rel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      readmeHtml = readmeHtml
+        .replace(new RegExp(`<a[^>]*href="\\./${esc}"[^>]*>\\s*<img[^>]*src="\\./${esc}"[^>]*>\\s*</a>`, "g"), "")
+        .replace(new RegExp(`<img[^>]*src="\\./${esc}"[^>]*>`, "g"), "");
+    }
+    if (missing.size) console.warn(`[GitHub profile] ${missing.size} relative asset(s) missing in ${login}/${login}: ${[...missing].join(", ")}`);
     readmeHtml = readmeHtml
       .replace(/src="\.\/([^"]+)"/g, `src="https://raw.githubusercontent.com/${login}/${login}/${branch}/$1"`)
       .replace(/href="\.\/([^"]+)"/g, `href="https://github.com/${login}/${login}/blob/${branch}/$1"`)
