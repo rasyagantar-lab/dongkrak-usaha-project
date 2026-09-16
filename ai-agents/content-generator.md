@@ -65,3 +65,5 @@ This file is your live rulebook: the application reads it fresh and shows it to 
 - [2026-09-14] Penyebutan nama merek mebel populer secara natural di dalam deskripsi memperkuat relevansi pencarian lokal tanpa terdeteksi sebagai keyword stuffing.
 - [2026-09-15] Menyajikan perbandingan risiko rakit sendiri vs profesional secara terstruktur membantu meningkatkan tingkat konversi tanpa terkesan agresif.
 - [2026-09-15] Mengganti placeholder daerah dengan gabungan wilayah cakupan resmi (Jabodetabek, Bandung, Surabaya) terbukti efektif mengatasi peringatan audit lokasi tanpa melakukan keyword stuffing.
+- [2026-09-16] Menyebutkan cakupan wilayah luas secara natural tanpa mengarang alamat spesifik membantu menjaga keakuratan data sambil tetap memperkuat lokal SEO.
+- [2026-09-16] Menyertakan kisaran harga resmi secara proporsional di dalam ringkasan produk membantu meningkatkan kejelasan informasi tanpa mengurangi estetika penulisan.

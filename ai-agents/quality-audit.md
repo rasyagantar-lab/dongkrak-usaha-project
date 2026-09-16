@@ -69,3 +69,4 @@ This file is your live rulebook: the application reads it fresh and shows it to 
 - [2026-09-15] Placeholder lokasi pada konten SEO harus secara otomatis memicu penurunan skor localRelevance dan ditandai sebagai temuan human untuk perbaikan data input.
 - [2026-09-15] Pemeriksaan placeholder lokasi harus mencakup evaluasi pada Judul, Deskripsi Meta, dan Alamat sekaligus agar pembenahan data bisnis oleh pengguna menjadi lebih efisien.
 - [2026-09-15] Penggunaan placeholder pada targetCities dan address harus secara konsisten diklasifikasikan sebagai temuan human dengan field yang tepat agar pemilik usaha dapat langsung memperbaikinya.
+- [2026-09-16] Placeholder locations in targetCities and address must always be flagged as human fixes with their respective fields.

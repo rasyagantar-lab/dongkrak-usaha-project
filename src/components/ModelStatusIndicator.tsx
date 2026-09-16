@@ -17,6 +17,8 @@ interface ModelSlot {
   cooldownSecondsLeft: number;
   quotaScope?: 'minute' | 'day' | 'none' | 'unknown';
   retryAfterSeconds?: number;
+  // Model-level (all keys) problem: the provider is saturated/hanging on this model.
+  unhealthy?: { secondsLeft: number; reason: string; strikes: number };
   successCount: number;
   failureCount: number;
   lastErrorStatus?: number;
@@ -28,6 +30,7 @@ interface ModelSlot {
 // exhausted 15m" hid the difference between "wait 30 seconds" and "this model has no
 // free allowance for this key at all".
 const unavailableLabel = (model: ModelSlot): string => {
+  if (model.unhealthy) return `model sedang bermasalah di Google (${model.unhealthy.reason}) · dilewati ${model.unhealthy.secondsLeft} dtk`;
   if (model.status === 'QUOTA_EXHAUSTED') {
     if (model.quotaScope === 'none') return 'tanpa jatah gratis (limit 0)';
     if (model.quotaScope === 'minute') return `limit per menit${model.retryAfterSeconds ? ` · coba lagi ${model.retryAfterSeconds} dtk` : ''}`;

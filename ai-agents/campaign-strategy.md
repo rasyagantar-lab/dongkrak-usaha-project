@@ -56,3 +56,6 @@ This file is your live rulebook: the application reads it fresh and shows it to 
 - [2026-09-14] Menonjolkan transparansi tarif awal mulai dari Rp 100.000 dan jaminan kerapihan untuk brand populer terbukti sangat efektif membangun trust pada layanan jasa panggilan lokal.
 - [2026-09-15] Menonjolkan garansi pengerjaan rapi dan kecepatan respons via WhatsApp sangat efektif untuk meningkatkan kepercayaan pada layanan jasa rakit furniture panggilan.
 - [2026-09-15] Menonjolkan transparansi harga awal dan garansi kerapihan untuk brand ternama sangat efektif membangun trust pada layanan jasa rakit furniture panggilan.
+- [2026-09-16] Menonjolkan kemudahan booking instan via WhatsApp dan transparansi batas harga awal sangat ampuh mendorong konversi cepat untuk jasa perakitan furniture panggilan.
+- [2026-09-16] Fokus pada fleksibilitas jadwal dan garansi pengerjaan ulang gratis terbukti ampuh mendorong konversi pelanggan perumahan baru.
+- [2026-09-16] Menekankan garansi pengerjaan presisi untuk brand ternama dan opsi booking instan via WhatsApp terbukti ampuh mendorong konversi cepat pada jasa perakitan furniture panggilan.

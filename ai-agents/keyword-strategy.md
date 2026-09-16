@@ -63,3 +63,6 @@ This file is your live rulebook: the application reads it fresh and shows it to 
 - [2026-09-15] Mengintegrasikan kata kunci kombinasi layanan bongkar-pasang pindahan dengan merek furniture spesifik di area Jabodetabek, Bandung, dan Surabaya terbukti memperkuat intent transaksi langsung.
 - [2026-09-15] Menargetkan kombinasi layanan spesifik seperti bongkar pasang furniture apartemen di kota besar terbukti efektif menjaring segmen pelanggan berpindah tempat tinggal dengan intent konversi tinggi.
 - [2026-09-15] Mengombinasikan kata kunci spesifik layanan perakitan brand ternama dengan agregasi wilayah kota besar (Jabodetabek, Bandung, Surabaya) efektif menangkap kueri pencarian berintent transaksi tinggi.
+- [2026-09-16] Menggabungkan merek populer furniture knockdown dengan layanan spesifik perakitan di kota-kota besar efektif meningkatkan relevansi klaster kata kunci lokal berintent komersial tinggi.
+- [2026-09-16] Mengombinasikan kata kunci layanan rakit furniture dengan merek populer dan cakupan kota besar secara spesifik terbukti efektif menghasilkan klaster keyword berintent komersial tinggi.
+- [2026-09-16] Mengombinasikan kata kunci layanan rakit furniture panggilan dengan nama brand populer serta kota-kota besar target secara spesifik sangat efektif menghasilkan klaster keyword berintent komersial tinggi.

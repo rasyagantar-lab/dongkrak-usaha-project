@@ -82,6 +82,9 @@ The builder checks these files before changing the application. Runtime orchestr
 - Every round is recorded in the ledger as `content-revisi-N` / `audit-ulang-N`, and summarised in `revisionHistory` with score before/after and whether it was accepted.
 - Observed behaviour on the first live run: audit `WARNINGS` at 88, revision produced 85, revision correctly discarded, original retained.
 
+## Slow Runs Are Diagnosed From The Attempt Trail (2026-09-16)
+- A 146-209 s run was traced to one hanging fallback model paid for by every stage, not to any agent's work. The ledger now records every provider attempt and router wait with its duration; the router skips a model that hung for all keys and cuts hanging calls at 30 s when a fallback exists. Typical run: ~23 s calm, 45-85 s during a provider storm. Agents' prompts, order of preference, and the audit loop are unchanged.
+
 ## Live Progress Is Visible To The Operator (2026-09-15)
 - Each stage now reports a label ("Riset keyword SEO", "Audit kualitas", "Revisi konten ke-1") and the ledger is exposed while the run is in flight (`GET /api/orchestrator/progress/:runId`). The operator sees stage-by-stage progress in the UI and a tray notification on other tabs -- a slow stage is no longer a silent spinner, it is a named stage with a running clock. Runs also keep going when the operator switches tabs or campaigns.
 
@@ -114,3 +117,6 @@ Do not invent unavailable models, hidden tools, or unsupported APIs. Use only do
 - [2026-09-15] Menekankan garansi perakitan presisi serta penyebutan merek furniture populer (IKEA, Informa, Dekoruma) secara konsisten memperkuat daya tarik penawaran jasa panggilan di kota-kota besar.
 - [2026-09-15] Penyebutan merek furniture populer secara konsisten memperkuat relevansi pencarian lokal pada layanan perakitan.
 - [2026-09-15] Adanya placeholder seperti '[Nama Daerah Target]' pada input bisnis harus diidentifikasi sejak awal sebagai pemicu hand-off manusia sebelum pipeline audit dijalankan.
+- [2026-09-16] Adanya placeholder lokasi pada data input memerlukan penanganan awal untuk memastikan penargetan lokasi spesifik tercapai sebelum rilis.
+- [2026-09-16] Placeholder nama daerah target wajib dideteksi sejak stage briefing agar tindakan koreksi data manusia dapat disiapkan sebelum publikasi.
+- [2026-09-16] Adanya data placeholder lokasi '[Nama Daerah Target]' pada profil bisnis harus ditandai sebagai keterbatasan awal untuk memicu penyesuaian manual pengguna sebelum finalisasi.

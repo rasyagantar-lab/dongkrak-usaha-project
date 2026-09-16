@@ -593,6 +593,29 @@ Status: PROVEN again, same sentinel method as 2026-09-14, on the current `server
 ## History Rewritten: Co-Author Trailer Removed (2026-09-16)
 The user asked for the Claude co-author line to disappear from the GitHub contributor list. All 13 affected commit MESSAGES on master and experiment/cloud-run were rewritten (trees, authors, dates untouched; verified content-identical) and experiment/cloud-run was force-pushed. Every commit SHA changed as a result: the master checkpoint is now 1171f88 (was 29781fe), experiment head ef65ec6 at the time of the rewrite. Older SHAs quoted in earlier entries (b25c13e, 5e663b5, 22dbe65, f75de33, d0bc279) no longer exist; find those commits by subject instead. Local backup tags backup/before-trailer-strip-* hold the old history. From here on, commits carry no attribution trailer.
 
+## Operator Feedback Round 4: "Orchestrator takes 3-5 minutes" -- Root Cause PROVEN, Fixed (2026-09-16)
+Status: PROVEN by attempt-level evidence (hosted run + 6 local runs); FIXED and VERIFIED under a live Google 503 storm.
+
+Evidence, hosted copy (AI Studio; its `server.ts` was diffed and is identical to ours): 145.9 s total; ledger showed Orchestrator/Strategy 47.0 s and Image Brief ~86 s (the number was hidden behind the status widget -- the "missing 78 s" was that stage), the other four stages 16 s together; 5/6 stages FALLBACK. Local reproduction the same hour: 208.8 s, and the new attempt trail named the culprit exactly:
+
+| stage | pro-preview | 3.6-flash | flash-latest | flash-lite |
+|---|---|---|---|---|
+| keyword | 429 0.3 s | 503 1.5 s | **503 after 24.0 s** | ok 1.7 s |
+| content | 503 2.3 s | 429 0.3 s | **503 after 35.6 s** | ok 2.2 s |
+| audit | 429 0.4 s | 503 3.0 s | **hung 60.0 s (client timeout)** | ok 1.9 s |
+| image | 503 3.3 s | 429 0.4 s | **504 after 59.0 s** | ok 1.8 s |
+
+Root cause (two of our own parameters, not the models' quality): (1) `gemini-flash-latest` (a discovered alias, third in every chain) HANGS instead of failing fast, and the per-call HTTP timeout was 60 s; (2) cooldowns were per key, and the six agents use six keys, so every stage re-learned the same hang. 4 stages x ~45 s = the whole delay. Not a cause: prompt size, thinking, revisions (0 rounds), our stage sequencing (sum of stages == total, gap 0-2 ms on every local run).
+
+Fixes (server.ts, router only; prompts/registry order/audit logic untouched):
+1. Attempt trail. `GenerationAttempt` gained `durationMs`, `kind: 'call'|'wait'`, `note`; attempts are carried across the router's wait-and-retry recursion (previously the first pass was lost); the ledger UI shows chips per attempt ("flash-latest · 504 · 29.0s", "tunggu · 45s") and a "Salin ledger (JSON)" button. This is what to read before touching any timing again.
+2. Model health shared across keys (`MODEL_HEALTH`). A transient failure (503/504/timeout/abort -- "This operation was aborted" is now classified transient too) is recorded per MODEL. It takes the model out of every key's chain only when the failure was EXPENSIVE (>=15 s, i.e. a hang) or it is the second strike within 2 minutes; a cheap first 503 keeps the per-key cooldown only, so the preferred model is re-probed by the next stage (measured: the same second one stage got a 503 from 3.6-flash, its sibling stage got an answer). Backoff 45 s -> 3 min -> 10 min, reset on success. Exposed in `/api/gemini/status` (`unhealthy`, `unhealthyModels`) and worded in the widget ("model sedang bermasalah di Google (504 after 29s) · dilewati 45 dtk"). 429 stays per key.
+3. Hedged timeout. A candidate with siblings behind it gets 30 s (slowest successful call observed with low thinking: 15 s under load); the last candidate keeps 60 s. Per request via `config.httpOptions`.
+
+Verified (same campaign cmp-001, same hour, Google in a visible 503 storm): 23.1 s when calm (all 3.6-flash); 44.7 / 85.6 / 59.4 / 45.2 s during the storm, with 3.6-flash still chosen on 4/6 stages when it answered -- versus 146-209 s before. Audit output unchanged in shape (WARNINGS, 65-70, same two human findings). Remaining ceiling is the provider: a run cannot be faster than its slowest healthy model, and flash-latest still costs one ~29 s probe when its backoff expires (then 3 min, then 10 min).
+
+Not done, deliberately: no hedged parallel requests (would double free-tier quota use), no permanent blacklist of flash-latest (AI_MODELS Rule 4 -- a today-sick alias may be healthy tomorrow; the backoff handles it), no persistence of MODEL_HEALTH (a fresh process should re-probe).
+
 ## Roadmap Completion Summary (2026-09-14)
 All four phases of the approved plan are implemented. Evidence status per phase:
 - Phase 1 MD contracts: PROVEN (sentinel twice, notes on disk, then real notes from a production siege run).

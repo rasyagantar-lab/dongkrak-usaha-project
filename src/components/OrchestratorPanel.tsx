@@ -16,6 +16,16 @@ import {
 import { Campaign } from '../types';
 import { useJobCenter, useJob, pollOrchestratorProgress } from '../jobs';
 
+interface LedgerAttempt {
+  model: string;
+  ok: boolean;
+  status?: number;
+  error?: string;
+  durationMs?: number;
+  kind?: 'call' | 'wait';
+  note?: string;
+}
+
 interface LedgerEntry {
   order: number;
   stage: string;
@@ -27,6 +37,7 @@ interface LedgerEntry {
   modelName?: string;
   fallbackOccurred?: boolean;
   keyFingerprint?: string;
+  attempts?: LedgerAttempt[];
   durationMs: number;
 }
 
@@ -99,6 +110,7 @@ const rowTone = (status: LedgerEntry['status']) =>
 export const OrchestratorPanel: React.FC<OrchestratorPanelProps> = ({ campaign, onUpdateCampaign }) => {
   const [objective, setObjective] = useState('Meningkatkan penjualan dan visibilitas lokal');
   const [applied, setApplied] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // The run itself lives in the App-level Job Center, keyed by campaign, so it keeps
   // going -- and its result stays readable -- when the user switches tabs or
@@ -318,8 +330,21 @@ export const OrchestratorPanel: React.FC<OrchestratorPanelProps> = ({ campaign, 
               ))}
             </div>
 
-            <div className="text-3xs text-slate-400 text-right">
-              Durasi total: {(run.durationMs / 1000).toFixed(1)} detik
+            <div className="flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  const text = JSON.stringify({ pipelineStatus: run.pipelineStatus, durationMs: run.durationMs, summary: run.summary, ledger: run.ledger, humanActionRequired: run.humanActionRequired }, null, 2);
+                  navigator.clipboard?.writeText(text).then(() => setCopied(true)).catch(() => setCopied(false));
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+                className="text-3xs font-semibold text-slate-500 hover:text-slate-800 underline cursor-pointer"
+              >
+                {copied ? 'Tersalin ✓' : 'Salin ledger (JSON) untuk laporan'}
+              </button>
+              <div className="text-3xs text-slate-400 text-right">
+                Durasi total: {(run.durationMs / 1000).toFixed(1)} detik
+              </div>
             </div>
           </div>
 
@@ -351,6 +376,28 @@ export const OrchestratorPanel: React.FC<OrchestratorPanelProps> = ({ campaign, 
                         )}
                         {entry.reason && (
                           <div className="text-3xs text-slate-600 mt-1 leading-relaxed">{entry.reason}</div>
+                        )}
+                        {/* Attempt trail: every provider call and every router wait, with
+                            its cost. This is what explains a slow stage -- read it before
+                            touching any timing parameter. */}
+                        {entry.attempts && entry.attempts.length > 1 && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {entry.attempts.map((a, i) => (
+                              <span
+                                key={i}
+                                title={a.note || a.error || ''}
+                                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-3xs font-mono ${
+                                  a.kind === 'wait' ? 'bg-amber-50 border-amber-200 text-amber-800'
+                                    : a.ok ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                                    : 'bg-rose-50 border-rose-200 text-rose-700'
+                                }`}
+                              >
+                                {a.kind === 'wait' ? 'tunggu' : a.model.replace('gemini-', '')}
+                                {a.kind !== 'wait' && !a.ok && a.status ? ` · ${a.status}` : ''}
+                                {typeof a.durationMs === 'number' ? ` · ${(a.durationMs / 1000).toFixed(1)}s` : ''}
+                              </span>
+                            ))}
+                          </div>
                         )}
                       </div>
                     </div>

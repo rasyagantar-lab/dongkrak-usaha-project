@@ -410,7 +410,7 @@ function classifyProviderError(err: any) {
   return {
     status,
     isQuota: status === 429 || msg.includes("RESOURCE_EXHAUSTED") || msg.includes("QUOTA") || msg.includes("RATE LIMIT"),
-    isTemporary: (status >= 500 && status < 600) || msg.includes("TIMEOUT") || msg.includes("TEMPORARILY UNAVAILABLE") || msg.includes("UNAVAILABLE"),
+    isTemporary: (status >= 500 && status < 600) || msg.includes("TIMEOUT") || msg.includes("TEMPORARILY UNAVAILABLE") || msg.includes("UNAVAILABLE") || msg.includes("ABORTED") || msg.includes("DEADLINE"),
     isNotFound: status === 404 || msg.includes("NOT FOUND"),
     isAuth: status === 401 || status === 403 || msg.includes("API_KEY_INVALID") || msg.includes("PERMISSION_DENIED"),
     isSafety: msg.includes("SAFETY") || msg.includes("BLOCKED"),
@@ -423,9 +423,56 @@ export interface GenerationAttempt {
   ok: boolean;
   status?: number;
   error?: string;
+  durationMs?: number;
+  // Router-side events that cost wall-clock time but are not provider calls
+  // ("wait" = the router slept before walking the chain again). Recorded so a slow
+  // stage can be read from the ledger instead of guessed at.
+  kind?: 'call' | 'wait';
+  note?: string;
 }
 
-async function generateWithFallback(options: { feature?: FeatureName, contents: any, config: any, __waited?: boolean }) {
+// ---- Model health, shared across keys ----
+// Measured 2026-09-16: with six agents on six keys, a model that hung (flash-latest:
+// 24 s, 36 s, 60 s timeout, 59 s 504) cost EVERY stage its own wait, because slot
+// cooldowns are per key and no stage could learn from the previous one. 503/504/
+// timeouts are the MODEL being saturated, not the key, so they are remembered here
+// once for all keys, with a backoff that grows on repeat and resets on success.
+// Quota (429) stays per key -- that really is key-specific.
+interface ModelHealth { strikes: number; lastAt: number; unavailableUntil: number; lastReason: string; }
+const MODEL_HEALTH = new Map<string, ModelHealth>();
+const MODEL_HEALTH_BACKOFF_MS = [45_000, 3 * 60_000, 10 * 60_000];
+// A fast 503 (a few seconds) is cheap to re-probe and the preferred model is worth
+// re-probing -- the same second one stage got a 503 on 3.6-flash, its sibling stage
+// got an answer from it. Only an EXPENSIVE failure (a hang: timeout/504 after >=15 s)
+// or a second strike within two minutes takes the model out for every key.
+const MODEL_HEALTH_EXPENSIVE_MS = 15_000;
+const MODEL_HEALTH_STRIKE_WINDOW_MS = 2 * 60_000;
+function recordModelTransient(modelId: string, reason: string, elapsedMs: number) {
+  const now = Date.now();
+  const h = MODEL_HEALTH.get(modelId) || { strikes: 0, lastAt: 0, unavailableUntil: 0, lastReason: '' };
+  h.strikes = now - h.lastAt < MODEL_HEALTH_STRIKE_WINDOW_MS ? h.strikes + 1 : 1;
+  h.lastAt = now;
+  h.lastReason = reason.slice(0, 120);
+  MODEL_HEALTH.set(modelId, h);
+  if (elapsedMs >= MODEL_HEALTH_EXPENSIVE_MS || h.strikes >= 2) {
+    h.unavailableUntil = now + MODEL_HEALTH_BACKOFF_MS[Math.min(h.strikes - 1, MODEL_HEALTH_BACKOFF_MS.length - 1)];
+    console.warn(`[AI Router] model ${modelId} marked unhealthy for all keys (${Math.round((h.unavailableUntil - now) / 1000)}s, strike ${h.strikes}): ${h.lastReason}`);
+  } else {
+    console.warn(`[AI Router] model ${modelId} transient strike ${h.strikes} (cheap, ${Math.round(elapsedMs / 1000)}s); still eligible for other keys.`);
+  }
+}
+function markModelHealthy(modelId: string) { MODEL_HEALTH.delete(modelId); }
+function modelUnhealthy(modelId: string): boolean {
+  const h = MODEL_HEALTH.get(modelId);
+  return !!h && h.unavailableUntil > Date.now();
+}
+
+// A call that has siblings behind it in the chain gets a shorter budget: the slowest
+// successful call observed with low thinking is ~10 s, and a hang beyond 30 s has
+// never turned into a good answer. The last candidate keeps the full 60 s.
+const CALL_TIMEOUT_MS = { hedged: 30_000, last: 60_000 };
+
+async function generateWithFallback(options: { feature?: FeatureName, contents: any, config: any, __waited?: boolean, __attempts?: GenerationAttempt[] }) {
   const feature = options.feature ?? "content";
   const featureConfig = FEATURE_MODEL_REGISTRY[feature];
   const apiKey = getFeatureApiKey(feature);
@@ -454,7 +501,7 @@ async function generateWithFallback(options: { feature?: FeatureName, contents: 
 
   const orderedSlots = extendedChain
     .map(modelId => getSlotState(keyFingerprint, modelId))
-    .filter(slot => slot.available);
+    .filter(slot => slot.available && !modelUnhealthy(slot.modelId));
 
   if (orderedSlots.length === 0) {
     // Everything is cooling. If the soonest to recover is only briefly unavailable
@@ -466,8 +513,10 @@ async function generateWithFallback(options: { feature?: FeatureName, contents: 
     const waitMs = soonest ? soonest.unavailableUntil! - Date.now() : Infinity;
     if (!options.__waited && waitMs > 0 && waitMs <= 50_000) {
       console.log(`[AI Router] feature=${feature}: all models cooling; waiting ${Math.ceil(waitMs / 1000)}s for ${soonest!.modelId} then retrying once.`);
+      const tWait = Date.now();
       await new Promise(r => setTimeout(r, waitMs + 500));
-      return generateWithFallback({ ...options, __waited: true });
+      const carried = [...(options.__attempts || []), { model: soonest!.modelId, ok: false, kind: 'wait' as const, durationMs: Date.now() - tWait, note: `semua model cooling; menunggu ${Math.ceil(waitMs / 1000)} dtk` }];
+      return generateWithFallback({ ...options, __waited: true, __attempts: carried });
     }
     const cooling = extendedChain.map(modelId => {
       const slot = getSlotState(keyFingerprint, modelId);
@@ -477,11 +526,12 @@ async function generateWithFallback(options: { feature?: FeatureName, contents: 
     throw new Error(`All models for feature ${feature} are cooling down on its key. ${cooling}`);
   }
 
-  const attempts: GenerationAttempt[] = [];
+  const attempts: GenerationAttempt[] = [...(options.__attempts || [])];
   const primaryModelId = orderedSlots[0].modelId;
   let fallbackOccurred = false;
 
   for (const slot of orderedSlots) {
+    const tCall = Date.now();
     try {
       if (slot.modelId !== primaryModelId) fallbackOccurred = true;
       console.log(`[AI Router] feature=${feature} key=${keyFingerprint} model=${slot.modelId}`);
@@ -493,9 +543,11 @@ async function generateWithFallback(options: { feature?: FeatureName, contents: 
       // flash-lite for thinkingBudget), so a rejection is remembered per model and
       // the same slot is retried once without it -- never counted as a slot failure.
       const wantsThinkingHint = featureConfig.modelKind === "text" && !THINKING_HINT_UNSUPPORTED.has(slot.modelId);
+      const isLastCandidate = slot === orderedSlots[orderedSlots.length - 1];
+      const httpOptions = { timeout: isLastCandidate ? CALL_TIMEOUT_MS.last : CALL_TIMEOUT_MS.hedged };
       const configWithHint = wantsThinkingHint
-        ? { ...options.config, thinkingConfig: { thinkingLevel: "low" } }
-        : options.config;
+        ? { ...options.config, thinkingConfig: { thinkingLevel: "low" }, httpOptions }
+        : { ...options.config, httpOptions };
 
       let response;
       try {
@@ -505,7 +557,7 @@ async function generateWithFallback(options: { feature?: FeatureName, contents: 
         if (wantsThinkingHint && c.isInvalid) {
           THINKING_HINT_UNSUPPORTED.add(slot.modelId);
           console.warn(`[AI Router] model ${slot.modelId} rejected thinkingConfig; retrying without it (remembered).`);
-          response = await ai.models.generateContent({ model: slot.modelId, contents: options.contents, config: options.config });
+          response = await ai.models.generateContent({ model: slot.modelId, contents: options.contents, config: { ...options.config, httpOptions } });
         } else {
           throw firstErr;
         }
@@ -513,7 +565,8 @@ async function generateWithFallback(options: { feature?: FeatureName, contents: 
 
       slot.successCount++;
       slot.lastUsedAt = Date.now();
-      attempts.push({ model: slot.modelId, ok: true });
+      markModelHealthy(slot.modelId);
+      attempts.push({ model: slot.modelId, ok: true, kind: 'call', durationMs: Date.now() - tCall });
       persistSlotState();
 
       return {
@@ -528,7 +581,7 @@ async function generateWithFallback(options: { feature?: FeatureName, contents: 
       const classified = classifyProviderError(err);
       console.error(`[AI Router] feature=${feature} key=${keyFingerprint} model=${slot.modelId} failed:`, err.message);
 
-      attempts.push({ model: slot.modelId, ok: false, status: classified.status, error: err.message });
+      attempts.push({ model: slot.modelId, ok: false, kind: 'call', status: classified.status, error: String(err.message || '').slice(0, 200), durationMs: Date.now() - tCall });
       slot.failureCount++;
       slot.lastErrorStatus = classified.status;
       slot.lastErrorMessage = String(err.message || '').slice(0, 300);
@@ -556,6 +609,7 @@ async function generateWithFallback(options: { feature?: FeatureName, contents: 
       } else if (classified.isTemporary) {
         slot.status = 'TEMPORARILY_UNAVAILABLE';
         slot.unavailableUntil = Date.now() + COOLDOWN_MS.temporary;
+        recordModelTransient(slot.modelId, `${classified.status || 'timeout'} after ${Math.round((Date.now() - tCall) / 1000)}s`, Date.now() - tCall);
       } else {
         slot.status = 'ERROR';
         slot.unavailableUntil = Date.now() + COOLDOWN_MS.unknown;
@@ -575,8 +629,10 @@ async function generateWithFallback(options: { feature?: FeatureName, contents: 
       .sort((a, b) => (a.unavailableUntil! - b.unavailableUntil!))[0];
     const waitMs = Math.min(50_000, Math.max(8_000, soonest ? soonest.unavailableUntil! - Date.now() : 20_000));
     console.log(`[AI Router] feature=${feature}: chain exhausted by transient errors; waiting ${Math.ceil(waitMs / 1000)}s and retrying once.`);
+    const tWait = Date.now();
     await new Promise(r => setTimeout(r, waitMs + 500));
-    return generateWithFallback({ ...options, __waited: true });
+    attempts.push({ model: soonest ? soonest.modelId : '(chain)', ok: false, kind: 'wait', durationMs: Date.now() - tWait, note: `rantai habis karena error sementara; menunggu ${Math.ceil(waitMs / 1000)} dtk lalu mengulang` });
+    return generateWithFallback({ ...options, __waited: true, __attempts: attempts });
   }
 
   throw new Error(`All models for feature ${feature} failed. Attempts: ${JSON.stringify(attempts)}`);
@@ -705,8 +761,9 @@ app.get("/api/gemini/status", async (req, res) => {
             modelId,
             name: slot.modelName,
             status: slot.status,
-            available: slot.available,
+            available: slot.available && !modelUnhealthy(modelId),
             cooldownSecondsLeft: slot.unavailableUntil ? Math.max(0, Math.ceil((slot.unavailableUntil - now) / 1000)) : 0,
+            unhealthy: modelUnhealthy(modelId) ? { secondsLeft: Math.ceil((MODEL_HEALTH.get(modelId)!.unavailableUntil - now) / 1000), reason: MODEL_HEALTH.get(modelId)!.lastReason, strikes: MODEL_HEALTH.get(modelId)!.strikes } : undefined,
             quotaScope: slot.quotaScope,
             retryAfterSeconds: slot.retryAfterSeconds,
             successCount: slot.successCount,
@@ -733,6 +790,7 @@ app.get("/api/gemini/status", async (req, res) => {
       features,
       sharedKeys,
       missingKeys: features.filter(f => !f.keyConfigured).map(f => f.apiKeyEnv),
+      unhealthyModels: [...MODEL_HEALTH.entries()].filter(([, h]) => h.unavailableUntil > now).map(([modelId, h]) => ({ modelId, secondsLeft: Math.ceil((h.unavailableUntil - now) / 1000), strikes: h.strikes, reason: h.lastReason })),
       generatedAt: new Date().toISOString()
     });
   } catch (err: any) {

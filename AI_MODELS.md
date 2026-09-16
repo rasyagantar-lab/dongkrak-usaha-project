@@ -119,6 +119,11 @@ This design keeps the system efficient, auditable, and quota-aware.
 - Text agents request low thinking effort (`thinkingConfig.thinkingLevel: "low"`) -- rules arrive in the prompt, deliberation is waste; a 49 s audit call was the symptom. Any model that rejects the parameter (400) is remembered and retried without it.
 - Rule 3's "retry twice" is superseded by this rule's parsed cooldowns + one storm-wait; do not add blind retries on top.
 
+### Rule 1L: Model health is per MODEL across keys; hangs are cut at 30 s (2026-09-16)
+- 503/504/timeouts describe the model, not the key. They are recorded in `MODEL_HEALTH` once for all keys; the model leaves every chain only after an expensive failure (>=15 s) or a second strike within 2 min, with backoff 45 s -> 3 min -> 10 min, reset on success. A cheap first 503 keeps only the per-key cooldown so the preferred model is re-probed. 429 remains per key (Rule 1K).
+- Per-call timeout: 30 s when a fallback exists behind the candidate, 60 s for the last candidate. Evidence: `gemini-flash-latest` hung for 24-60 s on four consecutive stages and no call that exceeded 30 s ever succeeded; the slowest good call under load was 15 s.
+- Every attempt (call or router wait) is recorded with its duration in the ledger (`attempts[]`). Read that trail before changing any timing constant; do not add blind retries.
+
 ### Rule 2: Fallback chain
 Each feature must define a strict fallback order, for example:
 - Primary model / primary key
