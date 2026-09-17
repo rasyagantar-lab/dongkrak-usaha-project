@@ -28,7 +28,7 @@ Then, by task type -- read only these, fully:
 | Any AI agent, prompt, model chain, quota/router behaviour | `AI_MODELS.md` (registry + Rules 1A-1L, 4) and the agent's own `ai-agents/<feature>.md`; `ai-agents/orchestrator.md` if the pipeline order or hand-off changes |
 | Orchestrator timing / "slow" reports | `PROJECT_KNOWLEDGE.md` "Operator Feedback Round 3" and "Round 4"; then the run's Task Ledger attempt trail (evidence first, code second) |
 | Extension / publishing / DongkrakUsaha form | `ai-agents/phase2-workflow.md`; `PROJECT_KNOWLEDGE.md` entries "Input Produk", "Share web", "Bug 1-5"; `public/extension/` is the only extension source |
-| Hosting, persistence, AI Studio, Cloud Run | `PROJECT_KNOWLEDGE.md` "EXPERIMENT" section; `DEPLOY_CLOUD_RUN.md`; `server/storage.ts` header comment |
+| Hosting, persistence, AI Studio, Cloud Run | `PROJECT_KNOWLEDGE.md` "EXPERIMENT" section AND the entry "AI Studio Runs In A Starter Tier Project" (2026-09-17: no Cloud Storage, no IAM, Firestore only); `DEPLOY_CLOUD_RUN.md` "Di AI Studio" section; `server/storage.ts` header comment. Never propose a bucket for AI Studio again without a billing upgrade |
 | UI / animation / splash / navigation | this file's "UI conventions"; `PROJECT_KNOWLEDGE.md` "UI Pass 2" and the latest splash entry; `src/changelog.ts` (add an entry) |
 | Images / captions / base photos | `AI_MODELS.md` Rule 1F and 1J; `ai-agents/image-generator.md`; `ai-agents/webp-converter.md` |
 | Git, accounts, repository hygiene | this file's "Commits" and "Branches"; `PROJECT_KNOWLEDGE.md` "History Rewritten" and "Repository Moved" |
