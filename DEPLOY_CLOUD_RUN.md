@@ -94,7 +94,7 @@ Temuan tambahan (2026-09-17, dari status line yang dikirim AI Studio): container
 
 Prosedur operator (urutannya penting):
 1. **Ambil versi terbaru repo dari GitHub dulu** (`rasyagantar-lab/dongkrak-usaha-project`, branch `experiment/cloud-run`). Copy AI Studio sering tertinggal dan ia mengedit filenya sendiri; tes di kode lama tidak berarti. Import ini juga menimpa edit-editnya.
-2. Pastikan **tidak ada** `GCS_BUCKET` di env AI Studio (kalau ada, mode gcs yang menang dan gagal).
+2. Set `STORAGE_BACKEND=firestore` di env AI Studio DAN hapus `GCS_BUCKET` dari env (bukan dari file). Pelajaran 2026-09-17: AI Studio melaporkan "GCS_BUCKET sudah dihapus" padahal yang dihapus cuma di file; env-nya masih ada dan mode gcs menang lagi setelah kode diambil dari GitHub. `STORAGE_BACKEND` memaksa modenya, apa pun sisa env yang ada.
 3. Set env: `FIRESTORE_PROJECT=<project id tempat Firestore disediakan>` dan `FIRESTORE_DATABASE=<database id>` -- nilainya dari laporan provisioning AI Studio / file `firebase-applet-config.json`. Restart.
 4. Baca **Koneksi -> Cadangan Data** (atau `GET /api/storage/status`):
    - Hijau *"Firestore <project> / <database> · koleksi du_storage tersambung"* -> selesai. Pulihkan cadangan terakhir, unggah ulang foto dasar.
