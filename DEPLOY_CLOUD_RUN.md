@@ -90,14 +90,18 @@ Kembali ke cara lokal: `git checkout master` di laptop, `npm run dev`. Tidak ada
 ## Di AI Studio (Starter Tier): data permanen lewat Firestore (2026-09-17)
 Fakta dari dokumentasi Google (dicek 2026-09-17): project **Starter Tier** yang dibuat AI Studio hanya menyediakan Cloud Run, Firebase Authentication, **Firestore**, Cloud SQL, dan Maps demo key. **Cloud Storage tidak ada, dan role IAM tidak bisa diubah** ("strictly managed by Google"). Percobaan bucket pertama (`storage.buckets.create` ditolak untuk `…-compute@developer.gserviceaccount.com`) adalah bukti langsungnya. Upgrade ke project standar = pasang billing (kartu). Jadi di AI Studio, penyimpanan permanen = **Firestore** (kuota Starter Tier: 1 GiB, 40.000 tulis/hari, 50.000 baca/hari -- lebih dari cukup).
 
-Yang harus dilakukan operator:
-1. **Jangan** set `GCS_BUCKET` di AI Studio (kalau ada, hapus -- kalau tidak, mode gcs yang dipilih dan gagal). Tidak perlu variabel lain: di Cloud Run tanpa `GCS_BUCKET`, app otomatis memakai Firestore.
-2. Deploy ulang dari repo.
-3. Buka app -> **Koneksi -> Cadangan Data**. Hijau: *"Penyimpanan permanen aktif -- Firestore (default) · koleksi du_storage tersambung"*. Selesai; pulihkan cadangan terakhir, unggah ulang foto dasar.
-4. Merah, baca sebabnya:
-   - *"Database Firestore belum ada di project ini"* -> database-nya belum disediakan. Di AI Studio, Firestore disediakan agent-nya ketika app "membutuhkan database" (blog resmi); minta hal itu **tanpa** menyuruhnya mengubah kode (mis. "provision Firestore for this app, do not change any file"), atau buka Cloud Console -> Firestore -> Create database (Native mode, Jakarta) kalau console mengizinkan. Lalu tekan periksa ulang -- tidak perlu deploy ulang.
-   - *"Service account belum boleh mengakses Firestore"* -> di Starter Tier ini harusnya tidak terjadi kalau Firestore sudah disediakan lewat AI Studio; kalau muncul, itu temuan baru: catat pesannya di PROJECT_KNOWLEDGE.md.
-   - Sesuatu tentang kredensial/project id -> hanya terjadi di laptop, bukan di Cloud Run.
+Temuan tambahan (2026-09-17, dari status line yang dikirim AI Studio): container-nya berjalan di project sandbox milik Google (`ais-asia-southeast1-…`), sedangkan Firestore disediakan AI Studio di project **milik lu** (`civic-ally-z9v0l`) sebagai database **bernama** (bukan `(default)`), dicatat AI Studio di file `firebase-applet-config.json` di copy-nya. Karena itu project dan database harus disebut eksplisit; app membacanya dari env dulu, lalu dari file itu kalau ada.
+
+Prosedur operator (urutannya penting):
+1. **Ambil versi terbaru repo dari GitHub dulu** (`rasyagantar-lab/dongkrak-usaha-project`, branch `experiment/cloud-run`). Copy AI Studio sering tertinggal dan ia mengedit filenya sendiri; tes di kode lama tidak berarti. Import ini juga menimpa edit-editnya.
+2. Pastikan **tidak ada** `GCS_BUCKET` di env AI Studio (kalau ada, mode gcs yang menang dan gagal).
+3. Set env: `FIRESTORE_PROJECT=<project id tempat Firestore disediakan>` dan `FIRESTORE_DATABASE=<database id>` -- nilainya dari laporan provisioning AI Studio / file `firebase-applet-config.json`. Restart.
+4. Baca **Koneksi -> Cadangan Data** (atau `GET /api/storage/status`):
+   - Hijau *"Firestore <project> / <database> · koleksi du_storage tersambung"* -> selesai. Pulihkan cadangan terakhir, unggah ulang foto dasar.
+   - *"API Firestore belum diaktifkan / database belum disediakan"* -> minta agent AI Studio menjalankan penyediaan Firestore (`set_up_firebase`) **tanpa mengubah file**, lalu periksa ulang.
+   - *"Service account container … tidak diizinkan mengakses Firestore di project …"* -> izin lintas-project sandbox -> project lu tidak ada, dan di Starter Tier tidak bisa lu beri. Ini batas platform; jalur berikutnya adalah Firestore lewat REST API + API key di bawah security rules (belum dibangun -- catat di PROJECT_KNOWLEDGE.md sebelum membangunnya).
+   - Kredensial / project id -> hanya terjadi di laptop.
+5. Server tidak pernah menunggu backend yang mati: pembacaan awal dibatasi 20 detik lalu jalan dengan data default, jadi kegagalan penyimpanan selalu terlihat sebagai baris merah, bukan container yang tidak hidup.
 
 Apa yang disimpan di Firestore: koleksi `du_storage` (satu dokumen per objek: campaigns.json, publish-history.json, tiap foto dasar, tiap gambar hasil, tiap log agent) dan `du_storage_chunks` untuk objek > 900 KB (dokumen Firestore maksimal 1 MiB). Aturan agent tetap dari repo -- mengeditnya butuh deploy ulang.
 
