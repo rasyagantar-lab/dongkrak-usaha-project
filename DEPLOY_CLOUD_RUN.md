@@ -109,5 +109,5 @@ Apa yang disimpan di Firestore: koleksi `du_storage` (satu dokumen per objek: ca
 
 Project standar (dengan billing) tetap bisa memakai bucket: set `GCS_BUCKET`, app membuat bucket-nya sendiri saat boot; kalau service account tidak boleh membuat bucket, beri role Storage Admin atau buat bucket manual + Storage Object Admin.
 
-## Sementara belum ada bucket: Cadangan Data (2026-09-16)
-Tanpa `GCS_BUCKET`, data di hosting hilang setiap server dimulai ulang -- ini sudah terjadi di AI Studio. Sampai bucket dipasang, pakai tab **Koneksi -> Cadangan Data**: unduh file JSON (semua campaign + riwayat) sebelum menutup sesi, dan pulihkan lewat "Pulihkan dari file" setelah deploy/restart. File yang sama juga dipakai untuk memindahkan data dari laptop ke hosting.
+## Cadangan Data tetap dipakai (2026-09-16, diperbarui 2026-09-17)
+Penyimpanan permanen di AI Studio sudah jalan lewat Firestore (hijau 2026-09-17). Cadangan tetap berguna: memindahkan data laptop -> hosting, dan jaring pengaman kalau rules/kuota Firestore berubah. Pakai tab **Koneksi -> Cadangan Data**: unduh file JSON (semua campaign + riwayat) sebelum menutup sesi, dan pulihkan lewat "Pulihkan dari file" setelah deploy/restart. File yang sama juga dipakai untuk memindahkan data dari laptop ke hosting.

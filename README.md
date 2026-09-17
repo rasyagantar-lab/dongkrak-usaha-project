@@ -20,7 +20,7 @@ Dikembangkan oleh Muhamad Rasya Ramadhan (siswa PKL, SMK Yadika 5). Pembimbing: 
 Setelah mengubah `.env`, matikan proses Node sepenuhnya lalu jalankan lagi (`npm run dev`).
 
 ## Menjalankan di Cloud Run (eksperimental)
-Lihat `DEPLOY_CLOUD_RUN.md`. Status: belum pernah di-deploy sungguhan.
+Lihat `DEPLOY_CLOUD_RUN.md`. Status: berjalan di AI Studio dengan penyimpanan Firestore (terverifikasi 2026-09-17).
 
 ## Dokumen proyek
 - `DEVELOPMENT_RULES.md` — aturan kerja pengembang (baca dulu sebelum mengubah apa pun).
