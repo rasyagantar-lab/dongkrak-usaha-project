@@ -154,11 +154,29 @@ export interface StorageProbe {
 // Writes, reads back and deletes one small object. This is the only way to KNOW
 // that the hosted copy can keep data: the mode alone says what was configured, not
 // whether the bucket exists or the service account may write to it.
-export async function probe(): Promise<StorageProbe> {
+// Maps the provider's error text to what the operator should do about it.
+export function hintFor(msg: string): string | undefined {
+  if (STORAGE_MODE !== "gcs") return undefined;
+  let hint: string | undefined;
+  {
+      if (/billing/i.test(msg)) hint = "Project Google Cloud ini belum punya akun billing aktif. Cloud Storage butuh billing walau pemakaian kecil gratis: Cloud Console -> Billing -> hubungkan akun billing ke project ini, lalu periksa ulang.";
+      else if (/403|permission|forbidden|does not have/i.test(msg)) hint = "Service account layanan belum punya izin. Paling cepat: Cloud Console -> IAM -> service account Cloud Run (…-compute@developer.gserviceaccount.com) -> tambah role Storage Admin, lalu periksa ulang (app akan membuat bucket sendiri). Alternatif: buat bucket manual lalu beri Storage Object Admin pada bucket itu.";
+      else if (/409|already exists|already own|conflict/i.test(msg)) hint = "Nama bucket sudah dipakai orang lain (nama bucket unik sedunia): ganti GCS_BUCKET ke nama lain, misalnya tambah angka.";
+      else if (/404|notfound|not found|no such bucket|does not exist/i.test(msg)) hint = "Bucket tidak ditemukan dan tidak bisa dibuat otomatis: cek ejaan GCS_BUCKET, atau buat manual di Cloud Storage lalu beri izin Storage Object Admin ke service account.";
+      else if (/could not load the default credentials|ADC|credential/i.test(msg)) hint = "Kredensial tidak ditemukan: di Cloud Run pakai service account layanan (ADC); di laptop butuh gcloud auth application-default login.";
+      else hint = "Lihat log server untuk detail; data TIDAK tersimpan sampai ini hijau.";
+    }
+  return hint;
+}
+
+export async function probe(creationError?: string): Promise<StorageProbe> {
   const t0 = Date.now();
   const key = `data/.probe-${t0}.json`;
   const payload = JSON.stringify({ probe: true, at: t0 });
   const base = { mode: STORAGE_MODE, bucket: STORAGE_MODE === "gcs" ? BUCKET_NAME : null, persistent: STORAGE_MODE === "gcs", checkedAt: new Date(t0).toISOString() };
+  if (creationError && STORAGE_MODE === "gcs") {
+    return { ...base, persistent: false, ok: false, latencyMs: 0, error: `Bucket tidak bisa dibuat otomatis: ${creationError}`, hint: hintFor(creationError) };
+  }
   try {
     await writeText(key, payload);
     const back = await readText(key);
@@ -167,15 +185,7 @@ export async function probe(): Promise<StorageProbe> {
     return { ...base, ok: true, latencyMs: Date.now() - t0 };
   } catch (err: any) {
     const msg = String(err?.message || err);
-    let hint: string | undefined;
-    if (STORAGE_MODE === "gcs") {
-      if (/billing/i.test(msg)) hint = "Project Google Cloud ini belum punya akun billing aktif. Cloud Storage butuh billing walau pemakaian kecil gratis: Cloud Console -> Billing -> hubungkan akun billing ke project ini, lalu periksa ulang.";
-      else if (/403|permission|forbidden|does not have/i.test(msg)) hint = "Service account layanan belum punya izin: bucket -> Permissions -> Grant access -> role Storage Object Admin.";
-      else if (/409|already exists|already own|conflict/i.test(msg)) hint = "Nama bucket sudah dipakai orang lain (nama bucket unik sedunia): ganti GCS_BUCKET ke nama lain, misalnya tambah angka.";
-      else if (/404|notfound|not found|no such bucket|does not exist/i.test(msg)) hint = "Bucket tidak ditemukan dan tidak bisa dibuat otomatis: cek ejaan GCS_BUCKET, atau buat manual di Cloud Storage lalu beri izin Storage Object Admin ke service account.";
-      else if (/could not load the default credentials|ADC|credential/i.test(msg)) hint = "Kredensial tidak ditemukan: di Cloud Run pakai service account layanan (ADC); di laptop butuh gcloud auth application-default login.";
-      else hint = "Lihat log server untuk detail; data TIDAK tersimpan sampai ini hijau.";
-    }
+    const hint = hintFor(msg);
     return { ...base, persistent: false, ok: false, latencyMs: Date.now() - t0, error: msg.slice(0, 300), hint };
   }
 }
