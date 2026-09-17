@@ -21,6 +21,7 @@
 // asset directories, preserving the on-disk layout the rest of the app already uses.
 import fs from "fs";
 import path from "path";
+import { adminTransport, restTransport, resolveTarget, selectTransport, type Transport } from "./firestoreTransport";
 
 const ASSET_PREFIXES = ["base-photos/", "generated-images/"];
 
@@ -29,24 +30,12 @@ export type StorageMode = "local" | "gcs" | "firestore";
 const BUCKET_NAME = (process.env.GCS_BUCKET || "").trim();
 const FIRESTORE_COLLECTION = (process.env.FIRESTORE_COLLECTION || "du_storage").trim();
 const FIRESTORE_CHUNKS = `${FIRESTORE_COLLECTION}_chunks`;
-// AI Studio provisions Firestore in the OWNER'S project (e.g. civic-ally-…) with a named
-// database, while the container itself runs in a Google-managed sandbox project (the
-// metadata server answers with that one). So project and database must be explicit.
-// Order: env vars, then the applet config file AI Studio writes next to the app
-// (firebase-applet-config.json), then the client's own default.
-function appletConfig(): { projectId?: string; databaseId?: string } {
-  try {
-    const raw = fs.readFileSync(path.join(process.cwd(), "firebase-applet-config.json"), "utf-8");
-    const j: any = JSON.parse(raw);
-    const fc = j.firebaseConfig || j.firebase || j;
-    const projectId = j.projectId || fc.projectId || j.project_id || fc.project_id;
-    const databaseId = j.firestoreDatabaseId || j.databaseId || j.firestore?.databaseId || j.database_id || j.firestore?.database_id || fc.firestoreDatabaseId;
-    return { projectId: projectId ? String(projectId) : undefined, databaseId: databaseId ? String(databaseId) : undefined };
-  } catch { return {}; }
-}
-const APPLET = appletConfig();
-const FIRESTORE_PROJECT = (process.env.FIRESTORE_PROJECT || APPLET.projectId || "").trim();      // "" = from ADC/metadata
-const FIRESTORE_DATABASE = (process.env.FIRESTORE_DATABASE || APPLET.databaseId || "").trim();   // "" = (default)
+// Project / database / API key: env, else AI Studio's firebase-applet-config.json
+// (see firestoreTransport.ts). The container may run in a Google sandbox project while
+// Firestore lives in the owner's project, so nothing here relies on the metadata default.
+const TARGET = resolveTarget();
+const FIRESTORE_PROJECT = TARGET.projectId || "";
+const FIRESTORE_DATABASE = TARGET.databaseId || "";
 const CHUNK_BYTES = 900_000; // under Firestore's 1 MiB document limit with headroom for fields
 
 function decideMode(): StorageMode {
@@ -61,7 +50,7 @@ export const STORAGE_MODE: StorageMode = decideMode();
 // Human label for logs and the Koneksi status line.
 export function backendLabel(): string {
   if (STORAGE_MODE === "gcs") return `bucket ${BUCKET_NAME}`;
-  if (STORAGE_MODE === "firestore") return `Firestore ${FIRESTORE_PROJECT || "(project dari metadata)"} / ${FIRESTORE_DATABASE || "(default)"} · koleksi ${FIRESTORE_COLLECTION}`;
+  if (STORAGE_MODE === "firestore") return `Firestore ${FIRESTORE_PROJECT || "(project dari metadata)"} / ${FIRESTORE_DATABASE || "(default)"} · koleksi ${FIRESTORE_COLLECTION}${activeTransport ? ` · via ${activeTransport.name}` : ""}`;
   return "disk lokal";
 }
 
@@ -84,65 +73,70 @@ async function bucket() {
   return bucketPromise;
 }
 
-// ---- Firestore (lazy; overridable for tests) ----
-let dbPromise: Promise<any> | null = null;
-let dbOverride: any = null;
-export function __setFirestoreForTests(client: any) { dbOverride = client; dbPromise = null; }
-async function db() {
-  if (dbOverride) return dbOverride;
-  if (!dbPromise) {
-    dbPromise = (async () => {
-      const { Firestore } = await import("@google-cloud/firestore");
-      // Project id comes from ADC / the Cloud Run metadata server; no key file.
-      return new Firestore({
-        ...(FIRESTORE_PROJECT ? { projectId: FIRESTORE_PROJECT } : {}),
-        ...(FIRESTORE_DATABASE ? { databaseId: FIRESTORE_DATABASE } : {})
-      });
-    })();
+// ---- Firestore: a transport chosen at boot (see firestoreTransport.ts) ----
+let activeTransport: Transport | null = null;
+let transportAttempts: Array<{ name: string; error: string }> = [];
+let transportOverride: Transport | null = null;
+export function __setFirestoreForTests(client: any) { transportOverride = adminTransport(client); activeTransport = transportOverride; }
+export function activeTransportName(): string | null { return activeTransport?.name ?? null; }
+
+async function makeAdmin(): Promise<Transport> {
+  const { Firestore } = await import("@google-cloud/firestore");
+  return adminTransport(new Firestore({
+    ...(FIRESTORE_PROJECT ? { projectId: FIRESTORE_PROJECT } : {}),
+    ...(FIRESTORE_DATABASE ? { databaseId: FIRESTORE_DATABASE } : {})
+  }));
+}
+// Order matters: the service account is the proper path where it has IAM access; the
+// REST paths are what AI Studio's sandbox needs (its service account has none).
+async function chooseTransport(): Promise<{ transport: Transport | null; attempts: typeof transportAttempts }> {
+  if (transportOverride) return { transport: transportOverride, attempts: [] };
+  const restTarget = { projectId: FIRESTORE_PROJECT, databaseId: FIRESTORE_DATABASE || "(default)", apiKey: TARGET.apiKey };
+  const candidates: Array<() => Promise<Transport>> = [makeAdmin];
+  if (TARGET.apiKey && FIRESTORE_PROJECT) {
+    candidates.push(async () => restTransport(restTarget, true));
+    candidates.push(async () => restTransport(restTarget, false));
   }
-  return dbPromise;
+  const result = await selectTransport(candidates, FIRESTORE_COLLECTION);
+  activeTransport = result.transport;
+  transportAttempts = result.attempts;
+  return result;
+}
+async function transport(): Promise<Transport> {
+  if (activeTransport) return activeTransport;
+  const r = await chooseTransport();
+  if (!r.transport) throw new Error(r.attempts.map(a => `${a.name}: ${a.error}`).join(" | ") || "no Firestore transport");
+  return r.transport;
 }
 const docId = (key: string) => encodeURIComponent(key);
-// Firestore's Node client returns Bytes fields as Buffer; be tolerant of Uint8Array and
-// of wrapper objects exposing toUint8Array() (some client versions / fakes).
-function toBuffer(v: any): Buffer {
-  if (Buffer.isBuffer(v)) return v;
-  if (v instanceof Uint8Array) return Buffer.from(v);
-  if (v && typeof v.toUint8Array === "function") return Buffer.from(v.toUint8Array());
-  if (v && v.type === "Buffer" && Array.isArray(v.data)) return Buffer.from(v.data);
-  return Buffer.from(v ?? []);
-}
 
 async function fsWrite(key: string, data: Buffer, kind: "text" | "binary"): Promise<void> {
-  const client = await db();
-  const main = client.collection(FIRESTORE_COLLECTION).doc(docId(key));
-  const chunksCol = client.collection(FIRESTORE_CHUNKS);
+  const t = await transport();
   // Drop stale chunks from a previous, larger version of the same key.
-  const old = await chunksCol.where("key", "==", key).get();
-  for (const d of old.docs) await d.ref.delete();
+  for (const old of await t.queryKeyEq(FIRESTORE_CHUNKS, key)) await t.deleteDoc(FIRESTORE_CHUNKS, old.id);
   const meta = { key, kind, contentType: contentTypeFor(key), size: data.length, updatedAt: new Date().toISOString() };
   if (data.length <= CHUNK_BYTES) {
-    await main.set({ ...meta, chunks: 0, data });
+    await t.setDoc(FIRESTORE_COLLECTION, docId(key), { ...meta, chunks: 0, data });
     return;
   }
   const n = Math.ceil(data.length / CHUNK_BYTES);
   for (let i = 0; i < n; i++) {
-    await chunksCol.doc(`${docId(key)}%23${i}`).set({ key, part: i, data: data.subarray(i * CHUNK_BYTES, (i + 1) * CHUNK_BYTES) });
+    await t.setDoc(FIRESTORE_CHUNKS, `${docId(key)}%23${i}`, { key, part: i, data: data.subarray(i * CHUNK_BYTES, (i + 1) * CHUNK_BYTES) });
   }
-  await main.set({ ...meta, chunks: n });
+  await t.setDoc(FIRESTORE_COLLECTION, docId(key), { ...meta, chunks: n });
 }
 
 async function fsRead(key: string): Promise<Buffer | null> {
-  const client = await db();
-  const snap = await client.collection(FIRESTORE_COLLECTION).doc(docId(key)).get();
-  if (!snap.exists) return null;
-  const d = snap.data();
-  if (!d.chunks) return toBuffer(d.data);
+  const t = await transport();
+  const d = await t.getDoc(FIRESTORE_COLLECTION, docId(key));
+  if (!d) return null;
+  const chunks = Number(d.chunks || 0);
+  if (!chunks) return Buffer.isBuffer(d.data) ? d.data : Buffer.from([]);
   const parts: Buffer[] = [];
-  for (let i = 0; i < d.chunks; i++) {
-    const c = await client.collection(FIRESTORE_CHUNKS).doc(`${docId(key)}%23${i}`).get();
-    if (!c.exists) throw new Error(`Firestore object ${key} is missing chunk ${i}/${d.chunks}`);
-    parts.push(toBuffer(c.data().data));
+  for (let i = 0; i < chunks; i++) {
+    const c = await t.getDoc(FIRESTORE_CHUNKS, `${docId(key)}%23${i}`);
+    if (!c || !Buffer.isBuffer(c.data)) throw new Error(`Firestore object ${key} is missing chunk ${i}/${chunks}`);
+    parts.push(c.data);
   }
   return Buffer.concat(parts);
 }
@@ -214,15 +208,8 @@ export async function list(prefix: string): Promise<StoredEntry[]> {
   if (STORAGE_MODE === "firestore") {
     // Range query on the single "key" field (auto-indexed); chunks live in their own
     // collection so no composite index is needed.
-    const client = await db();
-    const snap = await client.collection(FIRESTORE_COLLECTION)
-      .where("key", ">=", prefix)
-      .where("key", "<", prefix + "")
-      .get();
-    return snap.docs.map((d: any) => {
-      const v = d.data();
-      return { key: String(v.key), bytes: Number(v.size || 0), updatedAt: String(v.updatedAt || new Date().toISOString()) };
-    });
+    const rows = await (await transport()).queryKeyRange(FIRESTORE_COLLECTION, prefix, prefix + "");
+    return rows.map(v => ({ key: String(v.key), bytes: Number(v.size || 0), updatedAt: String(v.updatedAt || new Date().toISOString()) }));
   }
   const [files] = await (await bucket()).getFiles({ prefix });
   return files
@@ -241,10 +228,9 @@ export async function remove(key: string): Promise<void> {
     return;
   }
   if (STORAGE_MODE === "firestore") {
-    const client = await db();
-    const old = await client.collection(FIRESTORE_CHUNKS).where("key", "==", key).get();
-    for (const d of old.docs) await d.ref.delete();
-    await client.collection(FIRESTORE_COLLECTION).doc(docId(key)).delete();
+    const t = await transport();
+    for (const old of await t.queryKeyEq(FIRESTORE_CHUNKS, key)) await t.deleteDoc(FIRESTORE_CHUNKS, old.id);
+    await t.deleteDoc(FIRESTORE_COLLECTION, docId(key));
     return;
   }
   await (await bucket()).file(key).delete({ ignoreNotFound: true });
@@ -260,8 +246,12 @@ export async function ensureBackend(): Promise<{ mode: StorageMode; bucket: stri
   if (STORAGE_MODE === "local") return { ...base, existed: true, created: false };
   try {
     if (STORAGE_MODE === "firestore") {
-      const client = await db();
-      await client.collection(FIRESTORE_COLLECTION).doc("__readiness__").get();
+      activeTransport = transportOverride; // re-evaluate on every check (operator's "periksa ulang")
+      const r = await chooseTransport();
+      if (!r.transport) {
+        const detail = r.attempts.map(a => `[${a.name}] ${a.error}`).join(" · ");
+        return { ...base, existed: false, created: false, error: detail || "no transport could reach Firestore" };
+      }
       return { ...base, existed: true, created: false };
     }
     const { Storage } = await import("@google-cloud/storage");
@@ -299,6 +289,9 @@ export function hintFor(msg: string): string | undefined {
   if (STORAGE_MODE === "firestore") {
     if (/has not been used|is disabled|firestore.googleapis.com|Enable it by visiting/i.test(msg)) return "API Firestore belum diaktifkan / database belum disediakan di project ini. Di AI Studio: minta agent-nya menjalankan penyediaan Firestore (set_up_firebase) TANPA mengubah file repo, lalu periksa ulang. Di project standar: Cloud Console -> Firestore -> Create database (Native, Jakarta).";
     if (/NOT_FOUND|does not exist|no database|not found/i.test(msg)) return "Database Firestore belum ada di project ini. Di AI Studio: minta agent-nya menyediakan Firestore untuk app ini (atau Cloud Console -> Firestore -> Create database, mode Native, region Jakarta), lalu periksa ulang.";
+    if (/no Firestore transport|\[rest-/i.test(msg) && /PERMISSION_DENIED|403|Missing or insufficient permissions/i.test(msg)) return "Semua jalur ditolak: service account container tidak punya akses IAM, dan Security Rules Firestore menolak client (anonim maupun tanpa login). Perbaikan di Firebase Console -> Firestore -> Rules: izinkan koleksi du_storage dan du_storage_chunks untuk request.auth != null, dan aktifkan provider Anonymous di Authentication -> Sign-in method. Lalu periksa ulang.";
+    if (/anonymous sign-in failed/i.test(msg)) return "Provider Anonymous belum aktif di Firebase Authentication (Sign-in method -> Anonymous -> Enable), atau rules menolak client tanpa login.";
+    if (/REST transport needs a Firebase web API key/i.test(msg)) return "API key Firebase tidak ditemukan: set FIREBASE_API_KEY, atau pastikan firebase-applet-config.json ada di folder app.";
     if (/PERMISSION_DENIED|403|permission|forbidden/i.test(msg)) return `Service account container (project sandbox) tidak diizinkan mengakses Firestore di project ${FIRESTORE_PROJECT || "(tidak diset)"}. Butuh role Cloud Datastore User untuk service account itu di project tersebut (IAM), atau Firestore harus disediakan di project yang sama dengan container.`;
     if (/could not load the default credentials|ADC|credential|Unable to detect a Project Id/i.test(msg)) return "Kredensial/project tidak terdeteksi: di Cloud Run pakai service account layanan (ADC); di laptop butuh gcloud auth application-default login dan GOOGLE_CLOUD_PROJECT.";
     if (/billing/i.test(msg)) return "Project ini butuh billing untuk Firestore -- di Starter Tier seharusnya tidak; cek apakah project yang dipakai benar.";

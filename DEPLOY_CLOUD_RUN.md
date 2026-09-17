@@ -99,7 +99,9 @@ Prosedur operator (urutannya penting):
 4. Baca **Koneksi -> Cadangan Data** (atau `GET /api/storage/status`):
    - Hijau *"Firestore <project> / <database> · koleksi du_storage tersambung"* -> selesai. Pulihkan cadangan terakhir, unggah ulang foto dasar.
    - *"API Firestore belum diaktifkan / database belum disediakan"* -> minta agent AI Studio menjalankan penyediaan Firestore (`set_up_firebase`) **tanpa mengubah file**, lalu periksa ulang.
-   - *"Service account container … tidak diizinkan mengakses Firestore di project …"* -> izin lintas-project sandbox -> project lu tidak ada, dan di Starter Tier tidak bisa lu beri. Ini batas platform; jalur berikutnya adalah Firestore lewat REST API + API key di bawah security rules (belum dibangun -- catat di PROJECT_KNOWLEDGE.md sebelum membangunnya).
+   - Hijau dengan `via admin` = service account punya IAM; `via rest-anonymous` = jalur client Firebase (normal di AI Studio); `via rest-unauthenticated` = jalan, tapi Security Rules-nya terbuka untuk siapa pun yang tahu project id -- minta AI Studio mengetatkan rules ke `request.auth != null` untuk koleksi `du_storage` dan `du_storage_chunks` dan mengaktifkan provider **Anonymous** (Authentication -> Sign-in method); setelah itu app otomatis pindah ke `rest-anonymous`.
+   - Merah *"Semua jalur ditolak …"* -> (a) service account sandbox tidak punya IAM (normal di Starter Tier; boleh coba beri role Cloud Datastore User ke `ais-sandbox@…` di IAM project lu, kalau console mengizinkan), dan (b) rules menolak client. Perbaiki (b): Firebase Console -> Firestore -> Rules izinkan dua koleksi itu untuk `request.auth != null`, aktifkan Anonymous, periksa ulang.
+   - API key Firebase dibaca dari `firebase-applet-config.json` buatan AI Studio (atau env `FIREBASE_API_KEY`). Kalau file itu hilang setelah import dari GitHub, set env-nya.
    - Kredensial / project id -> hanya terjadi di laptop.
 5. Server tidak pernah menunggu backend yang mati: pembacaan awal dibatasi 20 detik lalu jalan dengan data default, jadi kegagalan penyimpanan selalu terlihat sebagai baris merah, bukan container yang tidak hidup.
 
