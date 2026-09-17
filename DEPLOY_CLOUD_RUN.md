@@ -90,11 +90,13 @@ Kembali ke cara lokal: `git checkout master` di laptop, `npm run dev`. Tidak ada
 ## Di AI Studio: cara membuat data permanen (2026-09-17)
 AI Studio menjalankan app ini di Cloud Run milik project Google Cloud lu. Disk container dibuang setiap deploy/restart/scale-to-zero — itu sebabnya campaign, riwayat, dan foto hilang. Obatnya sama dengan Cloud Run biasa: **bucket + variabel `GCS_BUCKET`**.
 
-1. **Bucket** — Cloud Console (project yang sama dengan yang dipakai AI Studio; namanya terlihat di halaman deploy AI Studio / di Cloud Run console) → Cloud Storage → Buckets → Create. Nama unik (misal `dongkrakusaha-data-rasya`), region Jakarta/Singapura, private. Catat namanya.
-2. **Variabel** — di AI Studio, di tempat yang sama lu mengisi `GEMINI_API_KEY_*`, tambahkan `GCS_BUCKET` = nama bucket. Deploy ulang.
+1. **Variabel** — di AI Studio, di tempat yang sama lu mengisi `GEMINI_API_KEY_*`, tambahkan `GCS_BUCKET` = nama bucket pilihan lu. Nama bucket unik sedunia, huruf kecil/angka/strip, misal `dongkrakusaha-data-rasya-2026`. Deploy ulang. **Tidak perlu membuat bucket di console**: saat boot app mengecek bucket itu, dan membuatnya sendiri (region Jakarta, `GCS_LOCATION` untuk mengubah) kalau belum ada.
+2. (Hanya kalau langkah 3 merah dengan pesan izin) buat bucket manual di Cloud Storage dengan nama yang sama, lalu beri service account Cloud Run role **Storage Object Admin**.
 3. **Bukti** — buka app → tab **Koneksi → Cadangan Data**. Baris status harus hijau: *"Penyimpanan permanen aktif — bucket … tersambung (tes tulis/baca N ms)"*. Server menulis, membaca, lalu menghapus satu objek uji; kalau hijau, data benar-benar tersimpan. Baris yang sama ada di log startup: `[Startup] storage probe ok (gcs bucket=…)`.
 4. **Kalau merah**, baris itu menyebut sebabnya dan perbaikannya:
-   - *"Bucket tidak ditemukan"* → ejaan `GCS_BUCKET` / project berbeda.
+   - *"Project ... belum punya akun billing aktif"* → Cloud Console → Billing → hubungkan akun billing ke project itu (pemakaian bucket sebesar ini gratis, tapi billing harus terpasang). Ini kemungkinan blocker utama; kalau lu tidak bisa memasang billing, hosting AI Studio tetap tanpa penyimpanan permanen dan andalkan Cadangan Data.
+   - *"Nama bucket sudah dipakai orang lain"* → ganti `GCS_BUCKET`.
+   - *"Bucket tidak ditemukan dan tidak bisa dibuat otomatis"* → ejaan / izin; lihat langkah 2.
    - *"Service account belum punya izin"* → bucket → Permissions → Grant access → service account Cloud Run (`…-compute@developer.gserviceaccount.com`) → role **Storage Object Admin** → deploy ulang.
    - *"Kredensial tidak ditemukan"* → hanya terjadi di laptop; di Cloud Run tidak.
 5. **Isi ulang data** — setelah hijau, pulihkan file cadangan terakhir lewat "Pulihkan dari file". Foto dasar yang diunggah sebelum ini harus diunggah ulang (yang lama ikut hilang bersama disk).

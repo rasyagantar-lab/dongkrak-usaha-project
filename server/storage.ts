@@ -40,6 +40,30 @@ async function bucket() {
   return bucketPromise;
 }
 
+// Creates the bucket on first boot if it does not exist yet, so the operator's only
+// step on the hosting side is setting GCS_BUCKET. Region defaults to Jakarta. The
+// service account on Cloud Run (default compute SA) normally holds
+// storage.buckets.create; if it does not, the probe that runs right after reports
+// the exact permission problem instead of this failing silently.
+export async function ensureBucket(): Promise<{ mode: StorageMode; bucket: string | null; existed: boolean; created: boolean; error?: string }> {
+  const base = { mode: STORAGE_MODE, bucket: STORAGE_MODE === "gcs" ? BUCKET_NAME : null };
+  if (STORAGE_MODE !== "gcs") return { ...base, existed: false, created: false };
+  try {
+    const { Storage } = await import("@google-cloud/storage");
+    const client = new Storage();
+    const [exists] = await client.bucket(BUCKET_NAME).exists();
+    if (exists) return { ...base, existed: true, created: false };
+    await client.createBucket(BUCKET_NAME, {
+      location: (process.env.GCS_LOCATION || "asia-southeast2").trim(),
+      storageClass: "STANDARD",
+      iam: { uniformBucketLevelAccess: { enabled: true } }
+    } as any);
+    return { ...base, existed: false, created: true };
+  } catch (err: any) {
+    return { ...base, existed: false, created: false, error: String(err?.message || err).slice(0, 300) };
+  }
+}
+
 export async function readText(key: string): Promise<string | null> {
   if (STORAGE_MODE === "local") {
     const p = localPathFor(key);
@@ -145,8 +169,10 @@ export async function probe(): Promise<StorageProbe> {
     const msg = String(err?.message || err);
     let hint: string | undefined;
     if (STORAGE_MODE === "gcs") {
-      if (/403|permission|forbidden|does not have/i.test(msg)) hint = "Service account layanan belum punya izin: bucket -> Permissions -> Grant access -> role Storage Object Admin.";
-      else if (/404|notfound|not found|no such bucket|does not exist/i.test(msg)) hint = "Bucket tidak ditemukan: cek ejaan GCS_BUCKET dan pastikan bucket ada di project yang sama.";
+      if (/billing/i.test(msg)) hint = "Project Google Cloud ini belum punya akun billing aktif. Cloud Storage butuh billing walau pemakaian kecil gratis: Cloud Console -> Billing -> hubungkan akun billing ke project ini, lalu periksa ulang.";
+      else if (/403|permission|forbidden|does not have/i.test(msg)) hint = "Service account layanan belum punya izin: bucket -> Permissions -> Grant access -> role Storage Object Admin.";
+      else if (/409|already exists|already own|conflict/i.test(msg)) hint = "Nama bucket sudah dipakai orang lain (nama bucket unik sedunia): ganti GCS_BUCKET ke nama lain, misalnya tambah angka.";
+      else if (/404|notfound|not found|no such bucket|does not exist/i.test(msg)) hint = "Bucket tidak ditemukan dan tidak bisa dibuat otomatis: cek ejaan GCS_BUCKET, atau buat manual di Cloud Storage lalu beri izin Storage Object Admin ke service account.";
       else if (/could not load the default credentials|ADC|credential/i.test(msg)) hint = "Kredensial tidak ditemukan: di Cloud Run pakai service account layanan (ADC); di laptop butuh gcloud auth application-default login.";
       else hint = "Lihat log server untuk detail; data TIDAK tersimpan sampai ini hijau.";
     }

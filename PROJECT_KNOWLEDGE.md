@@ -668,6 +668,14 @@ Added:
 
 Verified: local probe ok in 2-4 ms, no leftover probe file; forced gcs mode with a non-existent bucket -> `ok:false`, error "The specified bucket does not exist.", hint about GCS_BUCKET spelling, `persistent:false`; browser shows the amber local-disk line in Koneksi. Not yet verified (owner's step): a real bucket turning the line green on AI Studio.
 
+## Bucket Auto-Creation: Persistence On AI Studio Is Now One Variable (2026-09-17)
+Status: IMPLEMENTED; local/no-credential paths VERIFIED; the creation itself UNVERIFIED until the first hosted boot with `GCS_BUCKET` set (that boot proves it via the startup line + Koneksi status).
+
+- `storage.ensureBucket()`: in gcs mode, checks the bucket and creates it if missing (region `GCS_LOCATION`, default `asia-southeast2`; uniform bucket-level access). Runs at startup before the probe, and again from `GET /api/storage/status` so the operator's "periksa ulang" button can finish the setup after fixing permissions without a redeploy. Startup logs `bucket X did not exist and was created` / `found` / `missing and could not be created: <error>`.
+- New probe hints: billing ("The billing account for the owning project is disabled" -- seen live against a foreign bucket name; this is the likeliest real blocker, cf. EXPERIMENT item 8), 409 name taken, and a not-found variant that mentions auto-creation.
+- Verified locally: local mode unaffected (ensure is a no-op, probe 2 ms); gcs mode without credentials reports the credential error from ensure and the not-found error from the anonymous probe, both with hints; `tsc` clean; status route returns `bucketCreated`/`bucketError`.
+- Operator path is now: set `GCS_BUCKET` in AI Studio -> redeploy -> Koneksi shows green. DEPLOY_CLOUD_RUN.md updated accordingly; manual bucket + IAM demoted to the fallback for a permission error.
+
 ## Roadmap Completion Summary (2026-09-14)
 All four phases of the approved plan are implemented. Evidence status per phase:
 - Phase 1 MD contracts: PROVEN (sentinel twice, notes on disk, then real notes from a production siege run).

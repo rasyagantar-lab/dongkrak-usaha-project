@@ -946,7 +946,9 @@ app.get("/api/gemini/models", async (req, res) => {
 // write/read/delete round trip as the startup probe so the hosted copy can be
 // checked from the screen instead of from the log.
 app.get("/api/storage/status", async (req, res) => {
-  res.json(await storage.probe());
+  const ensured = await storage.ensureBucket();
+  const p = await storage.probe();
+  res.json({ ...p, bucketCreated: ensured.created, bucketError: ensured.error });
 });
 
 app.get("/api/backup", (req, res) => {
@@ -3013,7 +3015,12 @@ async function startServer() {
   console.log(`[Startup] storage=${storage.STORAGE_MODE}${storage.STORAGE_MODE === "gcs" ? ` bucket=${process.env.GCS_BUCKET}` : ""} node_env=${process.env.NODE_ENV || "development"}`);
   console.log(`[Startup] keys: ${configured.join(", ")}`);
   // Prove persistence at boot: the line every deploy is judged by.
-  storage.probe().then(p => {
+  storage.ensureBucket().then(b => {
+    if (b.mode !== "gcs") return;
+    if (b.created) console.log(`[Startup] bucket ${b.bucket} did not exist and was created (${process.env.GCS_LOCATION || "asia-southeast2"}).`);
+    else if (b.existed) console.log(`[Startup] bucket ${b.bucket} found.`);
+    else console.error(`[Startup] bucket ${b.bucket} missing and could not be created: ${b.error}`);
+  }).then(() => storage.probe()).then(p => {
     if (p.ok) console.log(`[Startup] storage probe ok (${p.mode}${p.bucket ? ` bucket=${p.bucket}` : ""}, ${p.latencyMs} ms)${p.persistent ? "" : " -- NOT persistent on hosted containers: set GCS_BUCKET"}`);
     else console.error(`[Startup] storage probe FAILED (${p.mode}${p.bucket ? ` bucket=${p.bucket}` : ""}): ${p.error}${p.hint ? ` -- ${p.hint}` : ""}`);
   });
