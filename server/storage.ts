@@ -29,7 +29,24 @@ export type StorageMode = "local" | "gcs" | "firestore";
 const BUCKET_NAME = (process.env.GCS_BUCKET || "").trim();
 const FIRESTORE_COLLECTION = (process.env.FIRESTORE_COLLECTION || "du_storage").trim();
 const FIRESTORE_CHUNKS = `${FIRESTORE_COLLECTION}_chunks`;
-const FIRESTORE_DATABASE = (process.env.FIRESTORE_DATABASE || "").trim(); // "" = (default)
+// AI Studio provisions Firestore in the OWNER'S project (e.g. civic-ally-…) with a named
+// database, while the container itself runs in a Google-managed sandbox project (the
+// metadata server answers with that one). So project and database must be explicit.
+// Order: env vars, then the applet config file AI Studio writes next to the app
+// (firebase-applet-config.json), then the client's own default.
+function appletConfig(): { projectId?: string; databaseId?: string } {
+  try {
+    const raw = fs.readFileSync(path.join(process.cwd(), "firebase-applet-config.json"), "utf-8");
+    const j: any = JSON.parse(raw);
+    const fc = j.firebaseConfig || j.firebase || j;
+    const projectId = j.projectId || fc.projectId || j.project_id || fc.project_id;
+    const databaseId = j.firestoreDatabaseId || j.databaseId || j.firestore?.databaseId || j.database_id || j.firestore?.database_id || fc.firestoreDatabaseId;
+    return { projectId: projectId ? String(projectId) : undefined, databaseId: databaseId ? String(databaseId) : undefined };
+  } catch { return {}; }
+}
+const APPLET = appletConfig();
+const FIRESTORE_PROJECT = (process.env.FIRESTORE_PROJECT || APPLET.projectId || "").trim();      // "" = from ADC/metadata
+const FIRESTORE_DATABASE = (process.env.FIRESTORE_DATABASE || APPLET.databaseId || "").trim();   // "" = (default)
 const CHUNK_BYTES = 900_000; // under Firestore's 1 MiB document limit with headroom for fields
 
 function decideMode(): StorageMode {
@@ -44,7 +61,7 @@ export const STORAGE_MODE: StorageMode = decideMode();
 // Human label for logs and the Koneksi status line.
 export function backendLabel(): string {
   if (STORAGE_MODE === "gcs") return `bucket ${BUCKET_NAME}`;
-  if (STORAGE_MODE === "firestore") return `Firestore ${FIRESTORE_DATABASE || "(default)"} · koleksi ${FIRESTORE_COLLECTION}`;
+  if (STORAGE_MODE === "firestore") return `Firestore ${FIRESTORE_PROJECT || "(project dari metadata)"} / ${FIRESTORE_DATABASE || "(default)"} · koleksi ${FIRESTORE_COLLECTION}`;
   return "disk lokal";
 }
 
@@ -77,7 +94,10 @@ async function db() {
     dbPromise = (async () => {
       const { Firestore } = await import("@google-cloud/firestore");
       // Project id comes from ADC / the Cloud Run metadata server; no key file.
-      return new Firestore(FIRESTORE_DATABASE ? { databaseId: FIRESTORE_DATABASE } : {});
+      return new Firestore({
+        ...(FIRESTORE_PROJECT ? { projectId: FIRESTORE_PROJECT } : {}),
+        ...(FIRESTORE_DATABASE ? { databaseId: FIRESTORE_DATABASE } : {})
+      });
     })();
   }
   return dbPromise;
@@ -279,7 +299,7 @@ export function hintFor(msg: string): string | undefined {
   if (STORAGE_MODE === "firestore") {
     if (/has not been used|is disabled|firestore.googleapis.com|Enable it by visiting/i.test(msg)) return "API Firestore belum diaktifkan / database belum disediakan di project ini. Di AI Studio: minta agent-nya menjalankan penyediaan Firestore (set_up_firebase) TANPA mengubah file repo, lalu periksa ulang. Di project standar: Cloud Console -> Firestore -> Create database (Native, Jakarta).";
     if (/NOT_FOUND|does not exist|no database|not found/i.test(msg)) return "Database Firestore belum ada di project ini. Di AI Studio: minta agent-nya menyediakan Firestore untuk app ini (atau Cloud Console -> Firestore -> Create database, mode Native, region Jakarta), lalu periksa ulang.";
-    if (/PERMISSION_DENIED|403|permission|forbidden/i.test(msg)) return "Service account layanan belum boleh mengakses Firestore (butuh role Cloud Datastore User / Firebase Admin). Di Starter Tier izin diatur Google: pastikan Firestore sudah disediakan lewat AI Studio.";
+    if (/PERMISSION_DENIED|403|permission|forbidden/i.test(msg)) return `Service account container (project sandbox) tidak diizinkan mengakses Firestore di project ${FIRESTORE_PROJECT || "(tidak diset)"}. Butuh role Cloud Datastore User untuk service account itu di project tersebut (IAM), atau Firestore harus disediakan di project yang sama dengan container.`;
     if (/could not load the default credentials|ADC|credential|Unable to detect a Project Id/i.test(msg)) return "Kredensial/project tidak terdeteksi: di Cloud Run pakai service account layanan (ADC); di laptop butuh gcloud auth application-default login dan GOOGLE_CLOUD_PROJECT.";
     if (/billing/i.test(msg)) return "Project ini butuh billing untuk Firestore -- di Starter Tier seharusnya tidak; cek apakah project yang dipakai benar.";
     return "Lihat log server untuk detail; data TIDAK tersimpan sampai ini hijau.";
