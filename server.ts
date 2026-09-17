@@ -28,6 +28,16 @@ const PORT = Number(process.env.PORT) || 3000;
 
 app.use(express.json({ limit: '10mb' }));
 
+// A cloud client library failing in a background timer (observed: google-auth-library
+// credential lookup with no ADC) must not take the whole server down. Log and keep
+// serving; the storage probe already reports the same failure on screen.
+process.on("unhandledRejection", (reason: any) => {
+  console.error("[Process] unhandled rejection:", reason?.message || reason);
+});
+process.on("uncaughtException", (err: any) => {
+  console.error("[Process] uncaught exception:", err?.message || err);
+});
+
 // Initialize DongkrakUsaha Publisher Adapter
 const adapter = new OfficialDongkrakUsahaAdapter();
 
@@ -2998,13 +3008,30 @@ app.get(["/base-photos/:name", "/generated-images/:name"], async (req, res) => {
 });
 
 async function startServer() {
-  // Load persisted state before accepting traffic. In gcs mode this is the only way
-  // data survives a container restart; in local mode it is the same disk read as before.
-  await loadCampaigns();
-  await OfficialDongkrakUsahaAdapter.loadHistory();
-  await primeContractCache();
-  await loadSlotState();
-  await loadRetiredModels();
+  // Load persisted state before accepting traffic. In a remote mode this is the only
+  // way data survives a container restart; in local mode it is the same disk read as
+  // before. A remote backend that does not answer must NOT hold the port hostage --
+  // Cloud Run kills a container that never listens, which turns a storage problem into
+  // a crash loop. So every boot read races a deadline; on timeout the app starts with
+  // defaults and the Koneksi storage line reports the real cause.
+  const BOOT_READ_TIMEOUT_MS = storage.STORAGE_MODE === "local" ? 60_000 : 20_000;
+  const bootRead = async (label: string, fn: () => Promise<void>) => {
+    let timer: NodeJS.Timeout | undefined;
+    const deadline = new Promise<"timeout">(resolve => { timer = setTimeout(() => resolve("timeout"), BOOT_READ_TIMEOUT_MS); });
+    try {
+      const result = await Promise.race([fn().then(() => "ok" as const), deadline]);
+      if (result === "timeout") console.error(`[Startup] ${label}: storage did not answer within ${BOOT_READ_TIMEOUT_MS / 1000}s (${storage.backendLabel()}); starting with defaults.`);
+    } catch (err: any) {
+      console.error(`[Startup] ${label} failed (${storage.backendLabel()}): ${err?.message || err}; starting with defaults.`);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  };
+  await bootRead("campaigns", loadCampaigns);
+  await bootRead("history", () => OfficialDongkrakUsahaAdapter.loadHistory());
+  await bootRead("agent contracts", primeContractCache);
+  await bootRead("model slots", loadSlotState);
+  await bootRead("retired models", loadRetiredModels);
 
   // Startup summary: storage mode and which provider slots are configured -- NAMES
   // only, never values. This is the first thing to read in Cloud Run logs when an
