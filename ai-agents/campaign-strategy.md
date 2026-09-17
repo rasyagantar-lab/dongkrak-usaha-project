@@ -59,3 +59,4 @@ This file is your live rulebook: the application reads it fresh and shows it to 
 - [2026-09-16] Menonjolkan kemudahan booking instan via WhatsApp dan transparansi batas harga awal sangat ampuh mendorong konversi cepat untuk jasa perakitan furniture panggilan.
 - [2026-09-16] Fokus pada fleksibilitas jadwal dan garansi pengerjaan ulang gratis terbukti ampuh mendorong konversi pelanggan perumahan baru.
 - [2026-09-16] Menekankan garansi pengerjaan presisi untuk brand ternama dan opsi booking instan via WhatsApp terbukti ampuh mendorong konversi cepat pada jasa perakitan furniture panggilan.
+- [2026-09-17] Menekankan transparansi harga awal dan garansi pengerjaan presisi terbukti efektif membangun trust dan mendorong konversi instan via WhatsApp.

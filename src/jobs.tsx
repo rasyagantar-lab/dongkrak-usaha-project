@@ -130,7 +130,10 @@ export const pollOrchestratorProgress = (runId: string, update: (u: JobUpdate) =
     } catch {
       /* transient; next tick retries */
     }
-    if (!stopped && !signal.aborted) setTimeout(tick, 2000);
+    // 1.2 s while a run is in flight: the canvas shows which agent is working, and
+    // a 2 s gap made hand-offs look like jumps rather than a flow. Polling stops the
+    // moment the run finishes, so this costs nothing at rest.
+    if (!stopped && !signal.aborted) setTimeout(tick, 1200);
   };
   setTimeout(tick, 600);
   return () => { stopped = true; };

@@ -82,6 +82,9 @@ The builder checks these files before changing the application. Runtime orchestr
 - Every round is recorded in the ledger as `content-revisi-N` / `audit-ulang-N`, and summarised in `revisionHistory` with score before/after and whether it was accepted.
 - Observed behaviour on the first live run: audit `WARNINGS` at 88, revision produced 85, revision correctly discarded, original retained.
 
+## Your Stages Are Drawn On Screen (2026-09-17)
+- The operator now watches this pipeline as a node canvas: every stage you record becomes a box, and the progress label you set ("Riset keyword SEO", "Audit kualitas") is what lights the node that is working. Stage names and labels are therefore user-facing text, not internal identifiers -- keep them short, in the operator's language, and stable. A renamed stage must also be mapped in `src/components/orchestrator/canvasGraph.ts`.
+
 ## Slow Runs Are Diagnosed From The Attempt Trail (2026-09-16)
 - A 146-209 s run was traced to one hanging fallback model paid for by every stage, not to any agent's work. The ledger now records every provider attempt and router wait with its duration; the router skips a model that hung for all keys and cuts hanging calls at 30 s when a fallback exists. Typical run: ~23 s calm, 45-85 s during a provider storm. Agents' prompts, order of preference, and the audit loop are unchanged.
 
@@ -120,3 +123,5 @@ Do not invent unavailable models, hidden tools, or unsupported APIs. Use only do
 - [2026-09-16] Adanya placeholder lokasi pada data input memerlukan penanganan awal untuk memastikan penargetan lokasi spesifik tercapai sebelum rilis.
 - [2026-09-16] Placeholder nama daerah target wajib dideteksi sejak stage briefing agar tindakan koreksi data manusia dapat disiapkan sebelum publikasi.
 - [2026-09-16] Adanya data placeholder lokasi '[Nama Daerah Target]' pada profil bisnis harus ditandai sebagai keterbatasan awal untuk memicu penyesuaian manual pengguna sebelum finalisasi.
+- [2026-09-17] Placeholder nama lokasi '[Nama Daerah Target]' pada profil input jasa rakit furniture harus ditandai sebagai keterbatasan awal sebelum pipeline audit dijalankan.
+- [2026-09-17] Penggunaan placeholder lokasi pada data input bisnis harus diidentifikasi sebagai batas awal untuk memicu penyesuaian manual oleh pengguna.

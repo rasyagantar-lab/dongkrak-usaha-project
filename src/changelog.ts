@@ -14,9 +14,21 @@ export interface ChangelogEntry {
   items: string[];
 }
 
-export const APP_VERSION = '2.5';
+export const APP_VERSION = '2.6';
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '2.6',
+    date: '2026-09-17',
+    title: 'Tab AI Orchestrator jadi peta agent',
+    items: [
+      'Orchestrator sekarang berupa kanvas: tiap agent jadi kotak, garisnya memperlihatkan siapa mengoper pekerjaan ke siapa.',
+      'Saat dijalankan, agent yang sedang bekerja menyala dan data terlihat mengalir di jalur yang benar-benar aktif — bukan animasi hiasan.',
+      'Klik sebuah agent untuk melihat model yang dipakai, lama kerjanya, percobaan yang gagal, dan hasil tahap itu.',
+      'Kanvas bisa di-zoom, digeser, dan dibuka layar penuh; ada tombol hemat kalau laptop terasa berat.',
+      'Kolom "Perlu Input Anda" kini menempel pada node-nya sendiri, lengkap dengan tombol Simpan & Jalankan Ulang.'
+    ]
+  },
   {
     version: '2.5.1',
     date: '2026-09-16',

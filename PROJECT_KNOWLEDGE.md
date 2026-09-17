@@ -713,6 +713,30 @@ Implementation (`server/firestoreTransport.ts` new; `server/storage.ts` refactor
 - OWNER DECISION (2026-09-17): feature closed here -- enough time spent. Accepted as-is: transport rest-unauthenticated with open rules on the two collections. Deferred, not forgotten: (a) operator restart-survival check, (b) Anonymous provider + request.auth != null rules. Do not reopen unless the owner asks or data actually goes missing.
 - What the hosted line can say next: green `via rest-anonymous` (done); green `via rest-unauthenticated` (works, but rules are open -- ask AI Studio to tighten to `request.auth != null` and enable Anonymous, then it flips to anonymous); red with the three attempts (rules deny both client paths -> fix rules / enable Anonymous in Firebase Console).
 
+## Orchestrator Tab Rebuilt As An Agent Canvas (2026-09-17)
+Status: DONE and VERIFIED (19/19 browser checks incl. a real cmp-001 run; desktop 1440 and phone 400).
+
+Why: the tab was a stack of report blocks (734 lines) that hid the product's actual subject -- seven agents handing work to each other. The owner asked for the shape automation tools use (n8n-style node canvas). Mid-build the owner corrected the brief: no maximal effects, the motion must show REAL progress.
+
+What it is now:
+- `src/components/orchestrator/canvasGraph.ts` -- the single place server stages map to nodes (`nodeForStage`; `content-revisi-N`/`audit-ulang-N` fold back onto the node they re-run, unknown stages are ignored, not fatal). Holds the topology, two coordinate sets (desktop = two stacked bands, phone = one vertical chain) and `deriveGraphState()` which turns ledger + progress label into per-node status, repeat counts and the <=3 active edges.
+- `AgentCanvas.tsx` -- dark canvas, pan/drag, wheel + pinch zoom, fit, fullscreen (Esc), semantic zoom (role line hidden below 78%), node cards with status/duration/×rounds/fallback.
+- `NodeInspector.tsx` -- everything the old blocks showed, attached to its node: ledger row, model + key fingerprint, attempt trail chips, stage output, audit findings + revision history, the hand-off editors (Simpan / Simpan & Jalankan Ulang), blockers + Terapkan on the sink node.
+- `OrchestratorPanel.tsx` -- shell only; all previous handlers kept (Job Center run, apply, human edits).
+
+Motion policy (owner's correction, now the rule): animation is a status signal.
+- Only edges feeding the stage the server reports as running are lit (glow = layered low-opacity strokes, never `filter: blur()`), one packet per edge, dashes flow on those edges only.
+- A running node shows an INDETERMINATE bar -- the server cannot report progress inside a stage, so the UI does not fake a percentage.
+- Everything stops when the run stops (verified: 0 particles when idle). `prefers-reduced-motion` disables motion; a "gerak/hemat" toggle is always available and remembered in localStorage; a one-second frame sample after a run starts auto-drops to hemat if avg frame > 22 ms.
+
+Bugs found and fixed while verifying (all were real, none cosmetic):
+1. `setPointerCapture` on canvas pointerdown swallowed every click on the floating chrome -- Jalankan, zoom, fullscreen and the objective input did nothing. Now pointerdown ignores targets inside `[data-node], button, input, textarea, select, a, label`.
+2. `deriveGraphState` returns fresh arrays each poll; keying the layout memo by identity re-ran auto-fit on every render and snapped the operator's zoom back mid-run. Layout is now keyed by array CONTENT and auto-fit runs only when the picture changes shape.
+3. Every tab stays mounted, so the panel is laid out at width 0 until opened; the first fit did nothing and never retried. A ResizeObserver fits when the canvas gains size.
+4. Composition: one long line fitted at 38% (unreadable) and clipped the first node. Rebuilt as two bands; fit floors at 60%, anchors to the start of the flow when the graph is wider than the frame, and leaves 104 px clear for the floating toolbar. Desktop now opens at 81% with nothing clipped.
+
+Verified: tsc + build clean; a real run drove the canvas keyword -> content -> audit -> image with particles 2 -> 1 -> 0; hemat toggle stops motion mid-run; reduced-motion rule ships; inspector opens per node and carries the hand-off editors; fullscreen 1376 px; no page errors; no horizontal overflow at 400 px. Remaining: the phone chain needs panning to reach the last node (deliberate -- shrinking further would make labels unreadable).
+
 ## Roadmap Completion Summary (2026-09-14)
 All four phases of the approved plan are implemented. Evidence status per phase:
 - Phase 1 MD contracts: PROVEN (sentinel twice, notes on disk, then real notes from a production siege run).
