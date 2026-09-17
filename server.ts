@@ -946,7 +946,7 @@ app.get("/api/gemini/models", async (req, res) => {
 // write/read/delete round trip as the startup probe so the hosted copy can be
 // checked from the screen instead of from the log.
 app.get("/api/storage/status", async (req, res) => {
-  const ensured = await storage.ensureBucket();
+  const ensured = await storage.ensureBackend();
   const p = await storage.probe(ensured.error);
   res.json({ ...p, bucketCreated: ensured.created, bucketError: ensured.error });
 });
@@ -1187,7 +1187,7 @@ function extractLogEntries(text: string): string[] {
 }
 
 async function primeContractCache(): Promise<void> {
-  if (storage.STORAGE_MODE !== "gcs") return;
+  if (storage.STORAGE_MODE === "local") return;
   const files = Object.values(FEATURE_MODEL_REGISTRY).map(c => c.contractFile).filter((f): f is string => !!f);
   for (const file of files) {
     const repoText = readRepoContract(file).replace(/\r\n/g, "\n");
@@ -1201,11 +1201,11 @@ async function primeContractCache(): Promise<void> {
       : repoText;
     CONTRACT_CACHE.set(file, merged);
   }
-  console.log(`[Agent Contract] gcs mode: ${files.length} contracts primed (repo rules + bucket logs).`);
+  console.log(`[Agent Contract] ${storage.STORAGE_MODE} mode: ${files.length} contracts primed (repo rules + stored logs).`);
 }
 
 function loadAgentContract(contractFile: string): string {
-  if (storage.STORAGE_MODE === "gcs") return CONTRACT_CACHE.get(contractFile) ?? readRepoContract(contractFile);
+  if (storage.STORAGE_MODE !== "local") return CONTRACT_CACHE.get(contractFile) ?? readRepoContract(contractFile);
   return readRepoContract(contractFile);
 }
 
@@ -1232,7 +1232,7 @@ sepenuhnya -- jangan mengarang catatan hanya supaya field terisi.`;
 function appendSelfImprovementNote(contractFile: string, note: string): void {
   const filePath = path.join(AGENT_CONTRACTS_DIR, contractFile);
   try {
-    const raw = storage.STORAGE_MODE === "gcs"
+    const raw = storage.STORAGE_MODE !== "local"
       ? (CONTRACT_CACHE.get(contractFile) ?? readRepoContract(contractFile))
       : (fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf-8") : "");
     const current = raw.replace(/\r\n/g, "\n");
@@ -1280,10 +1280,10 @@ function appendSelfImprovementNote(contractFile: string, note: string): void {
     }
     const capped = [...existingEntries, newEntry].slice(-MAX_SELF_IMPROVEMENT_ENTRIES);
     const updated = `${head}${capped.join("\n")}\n${tail ? "\n" + tail : ""}`;
-    if (storage.STORAGE_MODE === "gcs") {
+    if (storage.STORAGE_MODE !== "local") {
       CONTRACT_CACHE.set(contractFile, updated); // synchronous: the next call sees it immediately
       storage.writeText(contractStorageKey(contractFile), updated)
-        .catch(err => console.error(`[Agent Contract] gcs upload failed for ${contractFile}:`, err));
+        .catch(err => console.error(`[Agent Contract] remote upload failed for ${contractFile}:`, err));
     } else {
       fs.writeFileSync(filePath, updated);
     }
@@ -3012,17 +3012,18 @@ async function startServer() {
   const configured = Object.values(FEATURE_MODEL_REGISTRY)
     .filter(c => c.provider === "gemini")
     .map(c => `${c.apiKeyEnv}=${process.env[c.apiKeyEnv]?.trim() ? "set" : "MISSING"}`);
-  console.log(`[Startup] storage=${storage.STORAGE_MODE}${storage.STORAGE_MODE === "gcs" ? ` bucket=${process.env.GCS_BUCKET}` : ""} node_env=${process.env.NODE_ENV || "development"}`);
+  console.log(`[Startup] storage=${storage.STORAGE_MODE} (${storage.backendLabel()}) node_env=${process.env.NODE_ENV || "development"}`);
   console.log(`[Startup] keys: ${configured.join(", ")}`);
   // Prove persistence at boot: the line every deploy is judged by.
-  storage.ensureBucket().then(b => {
-    if (b.mode !== "gcs") return;
+  storage.ensureBackend().then(b => {
+    if (b.mode === "local") return b;
     if (b.created) console.log(`[Startup] bucket ${b.bucket} did not exist and was created (${process.env.GCS_LOCATION || "asia-southeast2"}).`);
-    else if (b.existed) console.log(`[Startup] bucket ${b.bucket} found.`);
-    else console.error(`[Startup] bucket ${b.bucket} missing and could not be created: ${b.error}`);
-  }).then(() => storage.ensureBucket()).then(b => storage.probe(b.error)).then(p => {
-    if (p.ok) console.log(`[Startup] storage probe ok (${p.mode}${p.bucket ? ` bucket=${p.bucket}` : ""}, ${p.latencyMs} ms)${p.persistent ? "" : " -- NOT persistent on hosted containers: set GCS_BUCKET"}`);
-    else console.error(`[Startup] storage probe FAILED (${p.mode}${p.bucket ? ` bucket=${p.bucket}` : ""}): ${p.error}${p.hint ? ` -- ${p.hint}` : ""}`);
+    else if (b.existed) console.log(`[Startup] ${storage.backendLabel()} reachable.`);
+    else console.error(`[Startup] ${storage.backendLabel()} NOT ready: ${b.error}`);
+    return b;
+  }).then(b => storage.probe(b.error)).then(p => {
+    if (p.ok) console.log(`[Startup] storage probe ok (${p.label}, ${p.latencyMs} ms)${p.persistent ? "" : " -- NOT persistent on hosted containers: set STORAGE_BACKEND=firestore or GCS_BUCKET"}`);
+    else console.error(`[Startup] storage probe FAILED (${p.label}): ${p.error}${p.hint ? ` -- ${p.hint}` : ""}`);
   });
   console.log(`[Startup] cloudflare: ${process.env.CLOUDFLARE_ACCOUNT_ID?.trim() && process.env.CLOUDFLARE_API_TOKEN_BITMAP?.trim() ? "set" : "not configured"}`);
 

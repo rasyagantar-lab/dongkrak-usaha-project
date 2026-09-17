@@ -58,7 +58,7 @@ Never write an API key, token, cookie, or credential value into any markdown or 
 
 ## Branches (as of 2026-09-14)
 - `master` = proven local/LAN state (checkpoint `1171f88`). `experiment/cloud-run` = Cloud Run hosting experiment, UNVERIFIED. Do not merge the experiment into master without a successful real deploy and the user's say-so. Read the "EXPERIMENT" section in PROJECT_KNOWLEDGE.md before touching either.
-- Storage mode is decided solely by the `GCS_BUCKET` env var (`server/storage.ts`): absent = local disk, exactly as master behaves.
+- Storage mode (`server/storage.ts`): `STORAGE_BACKEND` if set; else `gcs` when `GCS_BUCKET` is set; else `firestore` when running on Cloud Run (`K_SERVICE`, which includes AI Studio); else `local` = disk, exactly as master behaves. AI Studio Starter Tier projects have NO Cloud Storage and NO IAM changes (Google docs, 2026-09-17) -- Firestore is the only persistent option there. The Koneksi tab's storage line is the proof for any hosted deploy.
 
 ## UI conventions
 - Tailwind utilities only for animation (`transition-*`, `duration-*`, `motion-reduce:`). The `motion`/`framer-motion` package is not used; do not introduce it.

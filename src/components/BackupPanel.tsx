@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { DatabaseBackup, Download, Upload, RefreshCw, CheckCircle2, AlertTriangle, HardDrive, Cloud, XCircle } from 'lucide-react';
 
 interface StorageProbe {
-  mode: 'local' | 'gcs';
+  mode: 'local' | 'gcs' | 'firestore';
+  label: string;
   bucket: string | null;
   persistent: boolean;
   ok: boolean;
@@ -121,13 +122,13 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ onReloadCampaigns }) =
         <div className="min-w-0 flex-1 leading-relaxed">
           {!probe && <span>Memeriksa penyimpanan...</span>}
           {probe && probe.ok && probe.persistent && (
-            <span><strong>Penyimpanan permanen aktif</strong> — bucket <code className="font-mono">{probe.bucket}</code> tersambung (tes tulis/baca {probe.latencyMs} ms). Data aman saat server dimulai ulang.</span>
+            <span><strong>Penyimpanan permanen aktif</strong> — <code className="font-mono">{probe.label}</code> tersambung (tes tulis/baca {probe.latencyMs} ms). Data aman saat server dimulai ulang.</span>
           )}
           {probe && probe.ok && !probe.persistent && (
-            <span><strong>Disk lokal.</strong> Di laptop ini aman. Di hosting (AI Studio / Cloud Run) disk dibuang setiap server dimulai ulang — set <code className="font-mono">GCS_BUCKET</code> di sana, atau andalkan cadangan di bawah.</span>
+            <span><strong>Disk lokal.</strong> Di laptop ini aman. Di hosting (AI Studio / Cloud Run) disk dibuang setiap server dimulai ulang — di sana app otomatis memakai Firestore; kalau tidak, andalkan cadangan di bawah.</span>
           )}
           {probe && !probe.ok && (
-            <span><strong>Penyimpanan GAGAL</strong>{probe.bucket ? <> — bucket <code className="font-mono">{probe.bucket}</code></> : null}: {probe.error}{probe.hint ? <><br /><span className="font-semibold">Perbaikan:</span> {probe.hint}</> : null}</span>
+            <span><strong>Penyimpanan GAGAL</strong> — <code className="font-mono">{probe.label}</code>: {probe.error}{probe.hint ? <><br /><span className="font-semibold">Perbaikan:</span> {probe.hint}</> : null}</span>
           )}
         </div>
         <button type="button" onClick={runProbe} disabled={probing} title="Periksa ulang" className="shrink-0 p-1 rounded hover:bg-white/60 disabled:opacity-50 cursor-pointer">

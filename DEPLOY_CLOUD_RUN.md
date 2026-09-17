@@ -87,21 +87,21 @@ Ekstensi sudah mengizinkan `https://*.run.app/*`. Unduh zip-nya dari tab Koneksi
 ## Kalau gagal
 Kembali ke cara lokal: `git checkout master` di laptop, `npm run dev`. Tidak ada yang perlu di-undo — data lokal (`data/`, `.env`, foto) tidak pernah disentuh eksperimen ini.
 
-## Di AI Studio: cara membuat data permanen (2026-09-17)
-AI Studio menjalankan app ini di Cloud Run milik project Google Cloud lu. Disk container dibuang setiap deploy/restart/scale-to-zero — itu sebabnya campaign, riwayat, dan foto hilang. Obatnya sama dengan Cloud Run biasa: **bucket + variabel `GCS_BUCKET`**.
+## Di AI Studio (Starter Tier): data permanen lewat Firestore (2026-09-17)
+Fakta dari dokumentasi Google (dicek 2026-09-17): project **Starter Tier** yang dibuat AI Studio hanya menyediakan Cloud Run, Firebase Authentication, **Firestore**, Cloud SQL, dan Maps demo key. **Cloud Storage tidak ada, dan role IAM tidak bisa diubah** ("strictly managed by Google"). Percobaan bucket pertama (`storage.buckets.create` ditolak untuk `…-compute@developer.gserviceaccount.com`) adalah bukti langsungnya. Upgrade ke project standar = pasang billing (kartu). Jadi di AI Studio, penyimpanan permanen = **Firestore** (kuota Starter Tier: 1 GiB, 40.000 tulis/hari, 50.000 baca/hari -- lebih dari cukup).
 
-1. **Variabel** — di AI Studio, di tempat yang sama lu mengisi `GEMINI_API_KEY_*`, tambahkan `GCS_BUCKET` = nama bucket pilihan lu. Nama bucket unik sedunia, huruf kecil/angka/strip, misal `dongkrakusaha-data-rasya-2026`. Deploy ulang. **Tidak perlu membuat bucket di console**: saat boot app mengecek bucket itu, dan membuatnya sendiri (region Jakarta, `GCS_LOCATION` untuk mengubah) kalau belum ada.
-2. (Hanya kalau langkah 3 merah dengan pesan izin) buat bucket manual di Cloud Storage dengan nama yang sama, lalu beri service account Cloud Run role **Storage Object Admin**.
-3. **Bukti** — buka app → tab **Koneksi → Cadangan Data**. Baris status harus hijau: *"Penyimpanan permanen aktif — bucket … tersambung (tes tulis/baca N ms)"*. Server menulis, membaca, lalu menghapus satu objek uji; kalau hijau, data benar-benar tersimpan. Baris yang sama ada di log startup: `[Startup] storage probe ok (gcs bucket=…)`.
-4. **Kalau merah**, baris itu menyebut sebabnya dan perbaikannya:
-   - *"Project ... belum punya akun billing aktif"* → Cloud Console → Billing → hubungkan akun billing ke project itu (pemakaian bucket sebesar ini gratis, tapi billing harus terpasang). Ini kemungkinan blocker utama; kalau lu tidak bisa memasang billing, hosting AI Studio tetap tanpa penyimpanan permanen dan andalkan Cadangan Data.
-   - *"Nama bucket sudah dipakai orang lain"* → ganti `GCS_BUCKET`.
-   - *"Bucket tidak ditemukan dan tidak bisa dibuat otomatis"* → ejaan / izin; lihat langkah 2.
-   - *"Service account belum punya izin"* → bucket → Permissions → Grant access → service account Cloud Run (`…-compute@developer.gserviceaccount.com`) → role **Storage Object Admin** → deploy ulang.
-   - *"Kredensial tidak ditemukan"* → hanya terjadi di laptop; di Cloud Run tidak.
-5. **Isi ulang data** — setelah hijau, pulihkan file cadangan terakhir lewat "Pulihkan dari file". Foto dasar yang diunggah sebelum ini harus diunggah ulang (yang lama ikut hilang bersama disk).
+Yang harus dilakukan operator:
+1. **Jangan** set `GCS_BUCKET` di AI Studio (kalau ada, hapus -- kalau tidak, mode gcs yang dipilih dan gagal). Tidak perlu variabel lain: di Cloud Run tanpa `GCS_BUCKET`, app otomatis memakai Firestore.
+2. Deploy ulang dari repo.
+3. Buka app -> **Koneksi -> Cadangan Data**. Hijau: *"Penyimpanan permanen aktif -- Firestore (default) · koleksi du_storage tersambung"*. Selesai; pulihkan cadangan terakhir, unggah ulang foto dasar.
+4. Merah, baca sebabnya:
+   - *"Database Firestore belum ada di project ini"* -> database-nya belum disediakan. Di AI Studio, Firestore disediakan agent-nya ketika app "membutuhkan database" (blog resmi); minta hal itu **tanpa** menyuruhnya mengubah kode (mis. "provision Firestore for this app, do not change any file"), atau buka Cloud Console -> Firestore -> Create database (Native mode, Jakarta) kalau console mengizinkan. Lalu tekan periksa ulang -- tidak perlu deploy ulang.
+   - *"Service account belum boleh mengakses Firestore"* -> di Starter Tier ini harusnya tidak terjadi kalau Firestore sudah disediakan lewat AI Studio; kalau muncul, itu temuan baru: catat pesannya di PROJECT_KNOWLEDGE.md.
+   - Sesuatu tentang kredensial/project id -> hanya terjadi di laptop, bukan di Cloud Run.
 
-Yang ikut ke bucket saat mode ini aktif: campaign, riwayat publish, foto dasar, gambar hasil compose, dan catatan Self-Improvement agent. Aturan agent (`ai-agents/*.md`) tetap dari repo -- mengeditnya butuh deploy ulang.
+Apa yang disimpan di Firestore: koleksi `du_storage` (satu dokumen per objek: campaigns.json, publish-history.json, tiap foto dasar, tiap gambar hasil, tiap log agent) dan `du_storage_chunks` untuk objek > 900 KB (dokumen Firestore maksimal 1 MiB). Aturan agent tetap dari repo -- mengeditnya butuh deploy ulang.
+
+Project standar (dengan billing) tetap bisa memakai bucket: set `GCS_BUCKET`, app membuat bucket-nya sendiri saat boot; kalau service account tidak boleh membuat bucket, beri role Storage Admin atau buat bucket manual + Storage Object Admin.
 
 ## Sementara belum ada bucket: Cadangan Data (2026-09-16)
 Tanpa `GCS_BUCKET`, data di hosting hilang setiap server dimulai ulang -- ini sudah terjadi di AI Studio. Sampai bucket dipasang, pakai tab **Koneksi -> Cadangan Data**: unduh file JSON (semua campaign + riwayat) sebelum menutup sesi, dan pulihkan lewat "Pulihkan dari file" setelah deploy/restart. File yang sama juga dipakai untuk memindahkan data dari laptop ke hosting.
