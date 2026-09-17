@@ -277,6 +277,7 @@ export interface StorageProbe {
 export function hintFor(msg: string): string | undefined {
   if (STORAGE_MODE === "local") return undefined;
   if (STORAGE_MODE === "firestore") {
+    if (/has not been used|is disabled|firestore.googleapis.com|Enable it by visiting/i.test(msg)) return "API Firestore belum diaktifkan / database belum disediakan di project ini. Di AI Studio: minta agent-nya menjalankan penyediaan Firestore (set_up_firebase) TANPA mengubah file repo, lalu periksa ulang. Di project standar: Cloud Console -> Firestore -> Create database (Native, Jakarta).";
     if (/NOT_FOUND|does not exist|no database|not found/i.test(msg)) return "Database Firestore belum ada di project ini. Di AI Studio: minta agent-nya menyediakan Firestore untuk app ini (atau Cloud Console -> Firestore -> Create database, mode Native, region Jakarta), lalu periksa ulang.";
     if (/PERMISSION_DENIED|403|permission|forbidden/i.test(msg)) return "Service account layanan belum boleh mengakses Firestore (butuh role Cloud Datastore User / Firebase Admin). Di Starter Tier izin diatur Google: pastikan Firestore sudah disediakan lewat AI Studio.";
     if (/could not load the default credentials|ADC|credential|Unable to detect a Project Id/i.test(msg)) return "Kredensial/project tidak terdeteksi: di Cloud Run pakai service account layanan (ADC); di laptop butuh gcloud auth application-default login dan GOOGLE_CLOUD_PROJECT.";
