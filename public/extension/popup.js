@@ -4,6 +4,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const formStatusEl = document.getElementById('formStatus');
   const fieldsCountEl = document.getElementById('fieldsCount');
   const btnCheck = document.getElementById('btnCheck');
+  try {
+    const v = chrome.runtime.getManifest().version;
+    const badge = document.getElementById('extVersion');
+    if (badge && v) badge.textContent = 'v' + v;
+  } catch (e) {}
   const btnMeasure = document.getElementById('btnMeasure');
   const measureResultEl = document.getElementById('measureResult');
 

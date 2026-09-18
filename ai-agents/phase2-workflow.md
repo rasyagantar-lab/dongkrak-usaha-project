@@ -182,7 +182,7 @@ Every completed task in Phase 2 must update this file with what worked, what fai
 
 The DongkrakUsaha description field is a CKEditor rich-text box: it carries no `maxlength`, so the only proof of its limit is to save a long text and count what the page holds afterwards. Extension 1.2.0 adds the counter.
 
-1. Reload the unpacked extension (chrome://extensions -> reload) so 1.2.0 is active.
+1. Reload the unpacked extension (chrome://extensions -> reload) so 1.3.0 is active. Reloading kills the bridge in every open app tab: the background re-injects it and pushes the state, and the Publish tab shows an amber banner if it could not. If the Publish tab still says 0 fields, click the popup's **Refresh Status** or reload the app page.
 2. Open the Input Produk form -> extension popup -> **Ukur Field Halaman Ini**. Note every `maxlength` it lists (this answers the "deskripsi singkat 200 karakter" claim directly). The result also appears in the app's Publish tab under "Batas field terdeteksi".
 3. In AI Orchestrator, type "tulis 950–1000 kata" in the instruction field (the "Terbaca:" line must show the operator rule), run, Terapkan ke Campaign, then Publish (autopost) the campaign -- about 6.500 characters.
 4. Open the saved product's edit page -> **Ukur Field Halaman Ini** again. The Publish tab compares "dikirim" (the campaign's description) with "tersimpan" (what the page holds): "utuh" means no truncation at that size.

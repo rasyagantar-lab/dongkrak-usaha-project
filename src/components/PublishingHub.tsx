@@ -123,7 +123,10 @@ const FieldMeasurePanel: React.FC<{ measure: FieldMeasure | null; sentText?: str
   const fmt = (n?: number) => Number(n || 0).toLocaleString('id-ID');
   const sent = String(sentText || '').trim().length;
   const saved = measure.karakter || 0;
+  // An empty editor is not a truncated one: before a publish (or on a fresh form)
+  // there is simply nothing to compare yet.
   const verdict = !measure.ok || !sent ? null
+    : saved === 0 ? 'kolom deskripsi di halaman itu masih kosong — publish dulu, buka halaman edit produk, lalu ukur lagi'
     : saved >= sent * 0.97 ? 'utuh — tidak terpotong pada ukuran ini'
     : 'terpotong: tersimpan ' + fmt(saved) + ' dari ' + fmt(sent) + ' karakter';
   const inputs = measure.maxlengthInputs || [];
@@ -142,7 +145,7 @@ const FieldMeasurePanel: React.FC<{ measure: FieldMeasure | null; sentText?: str
         <div className="text-amber-300">Editor deskripsi tidak ditemukan di halaman itu{measure.error ? ' (' + measure.error + ')' : ''}. Buka form Input Produk atau halaman edit produk, lalu ukur lagi.</div>
       )}
       {verdict && (
-        <div className={saved >= sent * 0.97 ? 'text-emerald-300' : 'text-amber-300'}>
+        <div className={saved > 0 && saved >= sent * 0.97 ? 'text-emerald-300' : 'text-amber-300'}>
           Dikirim dari campaign aktif: {fmt(sent)} karakter → {verdict}
         </div>
       )}
@@ -150,6 +153,9 @@ const FieldMeasurePanel: React.FC<{ measure: FieldMeasure | null; sentText?: str
         {inputs.length > 0
           ? <>maxlength: {inputs.map((i, idx) => <span key={idx}>{idx > 0 ? ' · ' : ''}<span className="text-slate-200">{i.label || i.name}</span> = {i.maxlength}</span>)}</>
           : 'Tidak ada input dengan maxlength di halaman itu — batas deskripsi hanya bisa dibuktikan dengan simpan lalu ukur ulang.'}
+        {measure.ok && measure.editor === 'textarea' && (
+          <div className="text-slate-500 mt-1">Kolom deskripsi adalah textarea tanpa maxlength: batasnya (kalau ada) di server DongkrakUsaha, jadi tetap harus dibuktikan dengan simpan lalu ukur ulang.</div>
+        )}
       </div>
     </div>
   );
@@ -1123,6 +1129,20 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
       )}
 
       {/* EXTENSION PUBLISHER */}
+      {/* A dead bridge is invisible from the page: every request it sends goes nowhere
+          and nothing comes back. Say so, and say the two things that fix it. */}
+      {connectionStatus.appBridge === 'DISCONNECTED' && /invalidated/i.test(connectionStatus.lastFailureReason || '') && (
+        <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3.5 text-xs text-amber-900 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex-1 leading-relaxed">
+            <span className="font-bold">Extension baru saja di-reload atau di-update</span>, jadi jembatan ke halaman ini mati dan hasil pemindaian tidak bisa masuk.
+            Klik ikon extension → <span className="font-bold">Refresh Status</span> (status akan dikirim ulang ke sini), atau muat ulang halaman ini.
+          </div>
+          <button type="button" onClick={() => window.location.reload()} className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg cursor-pointer">
+            <RefreshCw className="w-3.5 h-3.5" /> Muat ulang halaman
+          </button>
+        </div>
+      )}
+
       {publisherMode === 'EXTENSION' && (
         <div className="space-y-6">
           {/* 4 Distinct Connection Status Cards */}

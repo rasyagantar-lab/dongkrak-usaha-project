@@ -33,6 +33,33 @@ let currentState = {
   lastUpdated: Date.now()
 };
 
+// Send the state the worker already holds to one app tab (used right after a
+// bridge is (re)injected there). Fire-and-forget: a tab that cannot receive it
+// will be covered by the next broadcast.
+function pushStateToTab(tabId, requestId) {
+  if (typeof chrome === 'undefined' || !chrome.tabs) return;
+  try {
+    chrome.tabs.sendMessage(tabId, {
+      action: 'STATE_UPDATED',
+      state: currentState,
+      payload: { dongkrakState: currentState },
+      requestId,
+      stateSequence: globalSequence
+    }).catch(() => {});
+  } catch (e) {}
+}
+
+// One inspection after a burst of re-injections (several tabs can be injected in
+// the same recovery pass); debounced so the DongkrakUsaha tab is asked once.
+let reinjectInspectionTimer = null;
+function scheduleReinjectInspection() {
+  if (reinjectInspectionTimer) clearTimeout(reinjectInspectionTimer);
+  reinjectInspectionTimer = setTimeout(() => {
+    reinjectInspectionTimer = null;
+    inspectAndSyncState('reinject-' + Date.now(), null, 'REINJECT');
+  }, 900);
+}
+
 // Proactively recover/re-inject App bridge into open SEO App tabs and DongkrakUsaha tabs on worker startup or recovery request
 function recoverAppBridgeTabs(targetTabId = null) {
   if (typeof chrome === 'undefined' || !chrome.tabs || !chrome.scripting) return;
@@ -61,6 +88,15 @@ function recoverAppBridgeTabs(targetTabId = null) {
             files: ['content.js']
           }).then(() => {
             console.log(`[EXT RECOVERY] INJECTION_SUCCESS tabId:${tab.id} tabUrl:${url}`);
+            // A bridge injected AFTER the last broadcast has never heard a state. Push
+            // the current one now, then run one live inspection so the app tab ends
+            // up with real fields instead of the "0 field" it was stuck on. Without
+            // this, reloading the extension left every open app tab deaf until the
+            // page itself was reloaded (owner report, 2026-09-18).
+            if (isAppTab) {
+              setTimeout(() => pushStateToTab(tab.id, 'reinject-' + Date.now()), 300);
+              scheduleReinjectInspection();
+            }
           }).catch(err => {
             console.warn(`[EXT RECOVERY] INJECTION_FAILED tabId:${tab.id} error:${err.message}`);
           });
@@ -86,7 +122,9 @@ if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
       console.log("[DONGKRAK EXT BG] Restored persisted state from chrome.storage.local. Sequence:", globalSequence, "Fields:", currentState.discoveredFields?.length);
     }
     recoverAppBridgeTabs();
-    inspectAndSyncState('boot-' + Date.now(), null, 'SERVICE_WORKER_STARTUP');
+    // Injection is asynchronous (PING round-trip, then executeScript); an inspection
+    // broadcast fired in the same tick reached the OLD, dead bridge and was lost.
+    setTimeout(() => inspectAndSyncState('boot-' + Date.now(), null, 'SERVICE_WORKER_STARTUP'), 1200);
   });
 } else {
   recoverAppBridgeTabs();
@@ -420,6 +458,17 @@ function broadcastStateToAppTabs(payload, requestId) {
               files: ['content.js']
             }).then(() => {
               console.log("[BACKGROUND] Re-injected content.js into app tab #", t.id);
+              // The message that failed is the one this tab needed; send it again
+              // once the new bridge has had a moment to register its listener.
+              setTimeout(() => {
+                chrome.tabs.sendMessage(t.id, {
+                  action: 'STATE_UPDATED',
+                  state: currentState,
+                  payload: payload || { dongkrakState: currentState },
+                  requestId,
+                  stateSequence: globalSequence
+                }).catch(() => {});
+              }, 300);
             }).catch(() => {});
           }
         }

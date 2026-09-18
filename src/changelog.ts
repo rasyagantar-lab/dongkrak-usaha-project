@@ -26,7 +26,8 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Di bawah kolom itu ada baris "Terbaca:" yang memberi tahu cara sistem menafsirkan instruksimu sebelum run dimulai, termasuk kalau permintaan dipotong plafon teknis dan kenapa.',
       'Kotak Konten di kanvas menampilkan tiga ukuran sekaligus (kata · kalimat · karakter) dan aturan yang dipakai run itu.',
       'Extension: tombol "Ukur Field Halaman Ini" menghitung isi kolom deskripsi DongkrakUsaha dan daftar batas maxlength — hasilnya muncul di tab Publish. Ini alat untuk memastikan batas field yang sebenarnya.',
-      'Badge versi di header sekarang selalu benar.'
+      'Badge versi di header sekarang selalu benar.',
+      'Setelah extension di-reload, tab Publish tidak lagi "buta" (0 field padahal popup melihat semuanya): status dikirim ulang otomatis, dan kalau gagal ada petunjuk jelas apa yang harus ditekan.'
     ]
   },
   {

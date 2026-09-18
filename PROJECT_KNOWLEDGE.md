@@ -53,6 +53,13 @@ Status: PROVEN / FIXED
 Root Cause: service worker re-injected content.js after it was already alive.
 Fix: Added PING guard and safer recovery logic.
 
+### Bug 6 - App Bridge Dies When The Extension Is Reloaded (2026-09-18)
+Status: MECHANISM FIXED (harness-verified) / OWNER VERIFICATION ON THE REAL SITE PENDING
+Symptom: the popup reports the DongkrakUsaha tab, login and N fields, but the app's Publish tab stays at 0 fields ("Authoritative form container not yet locked") and "Isi Form Otomatis" is disabled (it requires formDetected).
+Root Cause: reloading/updating the unpacked extension invalidates every content script in open tabs. The app-page bridge detects this and self-destructs (it posts DONGKRAK_BRIDGE_CONTEXT_INVALIDATED), but nothing on the page can resurrect it -- only the background can inject. The background did re-inject on onInstalled, yet (a) it never sent the freshly injected bridge any state (the boot inspection broadcast fired in the same tick, before injection finished, and reached the dead bridge), and (b) the broadcast catch path re-injected and then dropped the very message the tab needed. The hub has no retry timer, so the page sat at 0 until it was reloaded.
+Fix: background.js pushStateToTab() right after each successful app-tab injection + a debounced REINJECT inspection; the boot inspection waits 1.2 s for the recovery pass; the broadcast catch path re-sends the failed payload after re-injecting. PublishingHub shows an amber banner ("Extension baru saja di-reload…") with the two real remedies (popup Refresh Status, or reload the page) whenever the bridge reports an invalidated context.
+Not a regression of 1.2.0: with the current code in the harness (unpacked extension in Chromium, mock product form served at the real URL, app on localhost) REFRESH LIVE DOM finds 8 fields and "Isi Form Otomatis" fills the form; pushStateToTab + scheduleReinjectInspection from the service worker deliver the state and log the REINJECT inspection. The extension-reload event itself cannot be reproduced under Playwright (the reloaded worker is not observable), so the owner's real-site check is the final proof.
+
 ### Bug 5 - dotenv / Local Environment
 Status: FIXED BUT UNVERIFIED
 Root Cause: AI Studio injected env vars, but local runtime did not load .env.
@@ -718,6 +725,18 @@ Implementation (`server/firestoreTransport.ts` new; `server/storage.ts` refactor
 `public/dongkrakusaha-publisher-extension.zip` is tracked, and `generateExtensionZipBuffer` in `server.ts` rewrites it at every startup. JSZip stamps each entry -- the six files AND the directory entry -- with "now", so the file changed by ~42 bytes per start with identical contents and sat in source control as a phantom edit after every `npm run dev`. Fixed by pinning `date: EXTENSION_ZIP_DATE` (local-time 2026-01-01, so the DOS timestamp is timezone-independent) on the files and on an explicitly created directory entry (`zip.folder()` reuses an existing entry, so it must be created before the call). **Verified:** two restarts 61 s apart produce the same SHA-1; the zip still lists 7 entries with one shared date. From now on a dirty zip means the extension sources really changed.
 
 Also committed in the same batch: one self-improvement line the Strategy agent appended to `ai-agents/campaign-strategy.md` during the 2026-09-18 test run. Those runtime lines are the contract-growth mechanism (see `ai-agents/*.md` "Self-Improvement Rule"); they are committed as they appear, not reverted.
+
+## Owner Report After 1.2.0: Popup Sees 65 Fields, App Sees 0; First Field-Limit Evidence (2026-09-18, night)
+
+**Reports.** (1) Popup "Ukur Field": "Deskripsi di halaman: 0 karakter (textarea)" plus a maxlength list. (2) Autofill does nothing although the Input Produk tab is open. (3) "Real Browser Connection" first showed no live inspection, then worked, then the app's live DOM could not see fields while the popup could.
+
+**(2) and (3) are one problem -- Bug 6 above.** The owner had just reloaded the extension to get 1.2.0 (as instructed); the app tab kept a dead bridge, so its requests went nowhere, the fields stayed at 0, and "Isi Form Otomatis" stayed disabled because it requires formDetected. Verified in the harness that inspection and autofill work with the 1.2.0/1.3.0 code, so the measurement feature did not break them; the recovery gap was pre-existing and is now closed (see Bug 6).
+
+**(1) First evidence about the DongkrakUsaha form, from the owner's popup screenshot (65 fields detected):** every input that declares a maxlength is a META field -- "Meta Keyword = 165" and about twenty-five "Meta Deskripsi <site> = 165" inputs, one per syndication site (dongkrakusaha.com, proviral.my.id, jejaring.my.id, unilink.my.id, viapesan.my.id, prestise.my.id, …). The description field is a plain textarea (the popup said "textarea", not CKEditor) with NO maxlength, and the short description ("penawaran") has no maxlength either -- so the "200 karakter" claim is not enforced by the form, and the description limit, if any, is server-side and still has to be proven by publish -> reopen -> Ukur. Consequences: our metaDescription rule (120-160 chars) fits the 165-char meta inputs; the popup measured 0 characters because the form was empty at that moment, and the Publish tab's verdict now says "masih kosong -- publish dulu" instead of "terpotong" for that case.
+
+**Also:** popup badge reads the manifest version (was a hardcoded "v1.0.0"); extension is 1.3.0.
+
+**Owner's next check (real site):** reload the unpacked extension, keep the app tab open, click the popup's Refresh Status -> the Publish tab must show the fields within ~2 s without a page reload (or show the amber banner with the remedy). Then continue the field-limit procedure in phase2-workflow.md.
 
 ## Operator Instructions Take Precedence; Field-Limit Verification Tooling (2026-09-18, evening)
 

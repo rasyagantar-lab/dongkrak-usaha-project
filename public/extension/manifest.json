@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "DongkrakUsaha SEO Publisher Assistant",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Official Chrome Extension helper to inspect and publish listings directly into your DongkrakUsaha Member Dashboard.",
   "permissions": [
     "activeTab",
