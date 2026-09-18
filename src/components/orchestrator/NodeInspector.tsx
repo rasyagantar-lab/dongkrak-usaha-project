@@ -68,6 +68,20 @@ const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title
   </div>
 );
 
+// The supervisor's rule made visible: the server counts the same way (whitespace-
+// separated tokens), so this number matches the one the audit judged.
+const WORD_RANGE = { min: 500, max: 1000 };
+const WordCount: React.FC<{ text?: string }> = ({ text }) => {
+  const n = String(text || '').trim().split(/\s+/).filter(Boolean).length;
+  const ok = n >= WORD_RANGE.min && n <= WORD_RANGE.max;
+  return (
+    <div className="flex items-center gap-2 text-2xs">
+      <span className={`px-2 py-0.5 rounded font-bold ${ok ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'}`}>{n} kata</span>
+      <span className="text-slate-500">syarat {WORD_RANGE.min}–{WORD_RANGE.max} kata</span>
+    </div>
+  );
+};
+
 const Field: React.FC<{ label: string; value?: React.ReactNode }> = ({ label, value }) =>
   value === undefined || value === null || value === '' ? null : (
     <div className="text-xs">
@@ -204,6 +218,7 @@ export const NodeInspector: React.FC<InspectorProps> = ({
 
         {nodeId === 'content' && outputs?.generatedContent && (
           <Section title="Konten listing">
+            <WordCount text={outputs.generatedContent.seoDescription} />
             <Field label="Judul SEO" value={outputs.generatedContent.seoTitle} />
             <Field label="Meta" value={outputs.generatedContent.metaDescription} />
             <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{outputs.generatedContent.seoDescription}</p>

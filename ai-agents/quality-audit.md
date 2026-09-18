@@ -25,6 +25,8 @@ You are the specialist AI responsible for content quality control and publishing
 - Use categories such as Keywords, Location, Factual Consistency, Duplicate Content, Required Fields
 - Provide clear pass/warning/error classification
 - Score on 0-100 range
+- Length (2026-09-18): the description must be 500-1000 words. The application measures it and passes the number in the task ("Panjang SEO Content (dihitung server)"); use that number, never your own estimate. An out-of-range description is a "Length" finding of type "error", fixableBy "ai" -- the server appends this finding itself if you omit it, so readiness can never be READY while the length is wrong.
+- The operator's "Tujuan Campaign" instructions are part of the task; content that ignores them is a "warning" fixableBy "ai".
 
 ## Who Can Fix It: `fixableBy` (2026-09-15)
 Every warning/error finding MUST say who can act on it, because the orchestrator decides what happens next from this field:
@@ -56,6 +58,7 @@ This file is your live rulebook: the application reads it fresh and shows it to 
 
 ## Runtime Inputs
 - Campaign, generated content, and SEO strategy supplied in the task payload
+- Server-measured word count of the description and the operator's objective (2026-09-18)
 - Audit model and dedicated key route selected by the application
 
 ## Model Registry Contract
@@ -70,3 +73,4 @@ This file is your live rulebook: the application reads it fresh and shows it to 
 - [2026-09-15] Pemeriksaan placeholder lokasi harus mencakup evaluasi pada Judul, Deskripsi Meta, dan Alamat sekaligus agar pembenahan data bisnis oleh pengguna menjadi lebih efisien.
 - [2026-09-15] Penggunaan placeholder pada targetCities dan address harus secara konsisten diklasifikasikan sebagai temuan human dengan field yang tepat agar pemilik usaha dapat langsung memperbaikinya.
 - [2026-09-16] Placeholder locations in targetCities and address must always be flagged as human fixes with their respective fields.
+- [2026-09-18] Panjang konten server-measured harus selalu divalidasikan dengan ketat terhadap instruksi operator terkait target jumlah kata.

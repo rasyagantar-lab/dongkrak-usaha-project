@@ -124,6 +124,9 @@ This design keeps the system efficient, auditable, and quota-aware.
 - Per-call timeout: 30 s when a fallback exists behind the candidate, 60 s for the last candidate. Evidence: `gemini-flash-latest` hung for 24-60 s on four consecutive stages and no call that exceeded 30 s ever succeeded; the slowest good call under load was 15 s.
 - Every attempt (call or router wait) is recorded with its duration in the ledger (`attempts[]`). Read that trail before changing any timing constant; do not add blind retries.
 
+### Rule 1M: Long-form output is measured, not trusted (2026-09-18)
+The content stage now produces a 500-1000 word article (roughly 1.2-2k output tokens, well inside every candidate's limit and the 30 s hedged timeout on Flash: 10 s measured). Models do not count their own words -- flash-lite lands ~15 % under a per-section budget, Flash lands inside it -- so `server.ts` counts and, on a miss, spends ONE extra content call with the measured number. Budget one extra call per content stage in storm mode (flash-lite fallback) and none in calm mode.
+
 ### Rule 2: Fallback chain
 Each feature must define a strict fallback order, for example:
 - Primary model / primary key

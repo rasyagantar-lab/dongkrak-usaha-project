@@ -14,9 +14,19 @@ export interface ChangelogEntry {
   items: string[];
 }
 
-export const APP_VERSION = '2.6.1';
+export const APP_VERSION = '2.7';
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '2.7',
+    date: '2026-09-18',
+    title: 'Deskripsi jadi artikel SEO 500–1000 kata',
+    items: [
+      'Sesuai arahan pembimbing: deskripsi listing sekarang artikel SEO 500–1000 kata. Server yang menghitung katanya, bukan AI — kalau meleset, otomatis dikoreksi satu kali lalu diperiksa lagi oleh Audit.',
+      'Kolom "Tujuan & instruksi" di AI Orchestrator sekarang benar-benar sampai ke penulis konten dan auditor (sebelumnya cuma ke tahap perencanaan).',
+      'Klik kotak Konten di kanvas untuk melihat jumlah kata dan apakah sudah memenuhi syarat.'
+    ]
+  },
   {
     version: '2.6.1',
     date: '2026-09-18',

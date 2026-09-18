@@ -1457,7 +1457,21 @@ const CONTENT_SCHEMA = {
 // `revision` carries the previous draft plus the audit's objections. When present the
 // agent is rewriting rather than writing fresh, which is what lets the orchestrator
 // close the loop instead of shipping content the auditor already rejected.
-function runContentAgent(businessData: any, seoStrategy: any, revision?: { previousContent: any; audit: any }) {
+// The supervisor's publishing rule (2026-09-18): the listing description is an SEO
+// article of 500-1000 words. The model is told the target and the SERVER measures the
+// result -- models estimate their own word counts badly, so the number is never left
+// to them. One corrective pass is allowed before the audit sees the draft; after that
+// the audit's own (server-measured) length finding drives the normal revision loop.
+const CONTENT_WORDS = { min: 500, max: 1000, target: 650 };
+const countWords = (text: unknown) => String(text ?? "").trim().split(/\s+/).filter(Boolean).length;
+const wordsInRange = (n: number) => n >= CONTENT_WORDS.min && n <= CONTENT_WORDS.max;
+
+async function runContentAgent(
+  businessData: any,
+  seoStrategy: any,
+  revision?: { previousContent: any; audit: any },
+  objective?: string
+): Promise<{ result: any; meta: AgentMeta }> {
   const revisionBlock = revision
     ? `
 
@@ -1467,7 +1481,7 @@ Draft sebelumnya sudah dinilai oleh Quality Audit Agent dan DITOLAK/diberi catat
 Draft sebelumnya:
 - SEO Title: ${revision.previousContent?.seoTitle || ''}
 - Meta Description: ${revision.previousContent?.metaDescription || ''}
-- Deskripsi: ${String(revision.previousContent?.seoDescription || '').slice(0, 800)}
+- Deskripsi (${countWords(revision.previousContent?.seoDescription)} kata): ${String(revision.previousContent?.seoDescription || '').slice(0, 9000)}
 
 Hasil audit (status ${revision.audit?.publishingReadiness || 'WARNINGS'}, skor SEO ${revision.audit?.seoScore ?? '-'}, kualitas ${revision.audit?.contentQuality ?? '-'}, relevansi lokal ${revision.audit?.localRelevance ?? '-'}):
 ${(revision.audit?.findings || [])
@@ -1478,7 +1492,9 @@ ${(revision.audit?.findings || [])
 INSTRUKSI REVISI:
 - Perbaiki setiap temuan di atas yang bisa diperbaiki lewat penulisan ulang.
 - Temuan soal data yang memang TIDAK ADA (misal nomor WhatsApp atau alamat tidak diisi user) TIDAK BOLEH diperbaiki dengan mengarang data. Biarkan, jangan diisi dengan tebakan.
-- Pertahankan bagian yang sudah baik; jangan menulis ulang total tanpa alasan.`
+- Pertahankan bagian yang sudah baik; jangan menulis ulang total tanpa alasan.
+- Hasil revisi TETAP artikel utuh ${CONTENT_WORDS.min}-${CONTENT_WORDS.max} kata dengan enam bagian yang sama; jangan memendekkan
+  atau meringkas draft -- perbaiki temuan di dalam artikel yang ada.`
     : '';
 
   const prompt = `Anda adalah pakar Copywriting Local SEO Indonesia untuk listing bisnis di DongkrakUsaha (dongkrakusaha.com).
@@ -1497,15 +1513,48 @@ Strategi SEO:
 - Secondary Keywords: ${seoStrategy?.secondaryKeywords?.join(', ') || ''}
 - Content Angle: ${seoStrategy?.contentAngle || ''}
 
+Instruksi operator (dari kolom Tujuan Campaign): ${objective || '-'}
+
 PRINSIP WAJIB:
 1. Relevan dengan lokasi target tanpa melakukan keyword stuffing.
 2. Gaya bahasa natural, profesional, persuasif.
 3. JANGAN mengarang fakta bisnis, harga, sertifikasi, alamat, atau nomor kontak yang tidak diberikan user.
 4. Buat SEO Title yang menarik (maks 65 karakter).
 5. Buat Meta Description yang persuasif (120-160 karakter).
-6. Tulis deskripsi lengkap (SEO Content) yang terstruktur rapi.${revisionBlock}`;
+6. seoDescription adalah ARTIKEL SEO ${CONTENT_WORDS.min}-${CONTENT_WORDS.max} KATA (sasaran sekitar ${CONTENT_WORDS.target} kata).
+   Kurang dari ${CONTENT_WORDS.min} kata ditolak, lebih dari ${CONTENT_WORDS.max} kata ditolak. Teks polos: paragraf pendek,
+   sub-judul singkat di barisnya sendiri, tanpa simbol markdown (#, *, **).
+   Tulis dalam ENAM bagian, masing-masing 110-140 kata (jadi total sekitar ${CONTENT_WORDS.target} kata):
+   (1) pembuka yang menyebut layanan + area, (2) keunggulan dan alasan memilih, (3) rincian layanan/produk,
+   (4) proses kerja dari pesan sampai selesai, (5) area layanan, (6) cara pesan / CTA. Setiap bagian
+   diawali sub-judul singkat di barisnya sendiri.
+7. Instruksi operator di atas wajib diikuti selama tidak bertentangan dengan prinsip 3.${revisionBlock}`;
 
-  return runAgent("content", prompt, CONTENT_SCHEMA);
+  const first = await runAgent<any>("content", prompt, CONTENT_SCHEMA);
+  const words = countWords(first.result?.seoDescription);
+  if (wordsInRange(words) || !first.result?.seoDescription) return first;
+
+  // Out of range: one targeted pass on the same draft, with the measured number.
+  const t0 = Date.now();
+  const fixPrompt = `${prompt}
+
+KOREKSI PANJANG (dihitung server, bukan perkiraan): draft Anda ${words} kata, syarat ${CONTENT_WORDS.min}-${CONTENT_WORDS.max} kata.
+${words < CONTENT_WORDS.min ? 'PERLUAS' : 'PERSINGKAT'} seoDescription menjadi sekitar ${CONTENT_WORDS.target} kata TANPA menambah fakta baru:
+tulis ulang sebagai ENAM bagian ber-sub-judul, masing-masing 110-140 kata
+(${words < CONTENT_WORDS.min ? 'perdalam manfaat, rincian layanan, proses kerja, area layanan, dan cara pesan' : 'buang pengulangan dan kalimat umum di tiap bagian'}).
+Field lain (seoTitle, metaDescription, shortSnippet, productHighlights, callToAction, mappedCategory, tags) pertahankan.
+
+Draft Anda:
+${first.result.seoDescription}`;
+  const second = await runAgent<any>("content", fixPrompt, CONTENT_SCHEMA);
+  const words2 = countWords(second.result?.seoDescription);
+  const keepSecond = wordsInRange(words2) || Math.abs(words2 - CONTENT_WORDS.target) < Math.abs(words - CONTENT_WORDS.target);
+  const chosen = keepSecond ? second : first;
+  const trail: GenerationAttempt = {
+    model: second.meta.modelUsed, ok: true, kind: 'call', durationMs: Date.now() - t0,
+    note: `panjang ${words} kata -> koreksi -> ${words2} kata${keepSecond ? '' : ' (draft pertama dipertahankan)'}`
+  };
+  return { result: chosen.result, meta: { ...chosen.meta, attempts: [...first.meta.attempts, ...second.meta.attempts, trail] } };
 }
 
 // --- Quality Audit Agent (ai-agents/quality-audit.md) ---
@@ -1579,12 +1628,16 @@ function normaliseFinding(f: any): AuditFinding {
   return { type, category, message: String(f?.message || ""), fixableBy, field, suggestion: f?.suggestion ? String(f.suggestion) : undefined };
 }
 
-function runAuditAgent(campaign: any) {
+async function runAuditAgent(campaign: any, objective?: string): Promise<{ result: any; meta: AgentMeta }> {
+  const description = campaign.generatedContent?.seoDescription;
+  const words = countWords(description);
   const prompt = `Evaluasi Kualitas SEO dan Kesiapan Publishing untuk listing DongkrakUsaha berikut:
 
 Title: ${campaign.generatedContent?.seoTitle || campaign.businessData.name}
 Meta Description: ${campaign.generatedContent?.metaDescription || ''}
-SEO Content: ${campaign.generatedContent?.seoDescription || campaign.businessData.description}
+Panjang SEO Content (dihitung server): ${words} kata. Syarat: ${CONTENT_WORDS.min}-${CONTENT_WORDS.max} kata. Jangan menghitung ulang sendiri.
+Instruksi operator (Tujuan Campaign): ${objective || '-'}
+SEO Content: ${description || campaign.businessData.description}
 Main Keyword: ${campaign.seoStrategy?.mainKeyword || campaign.businessData.mainKeyword}
 Target Cities: ${asList(campaign.businessData.targetCities)}
 Category: ${campaign.businessData.category}
@@ -1612,7 +1665,24 @@ businessName, category, description, productsServices, priceRange, website, othe
 "suggestion" dengan satu kalimat apa yang harus diubah pemilik usaha.
 Jangan pernah menyarankan mengarang data untuk temuan "human".`;
 
-  return runAgent("audit", prompt, AUDIT_SCHEMA);
+  const out = await runAgent<any>("audit", prompt, AUDIT_SCHEMA);
+  // The length verdict is the server's, not the model's: appended here so the
+  // revision loop reacts to it whether or not the auditor mentioned it.
+  if (description && !wordsInRange(words) && out.result) {
+    const findings = Array.isArray(out.result.findings)
+      ? out.result.findings.filter((f: any) => !/^(length|panjang)$/i.test(String(f?.category || '')))
+      : [];
+    findings.push({
+      type: 'error',
+      category: 'Length',
+      message: `Deskripsi ${words} kata; syarat ${CONTENT_WORDS.min}-${CONTENT_WORDS.max} kata.`,
+      fixableBy: 'ai',
+      suggestion: words < CONTENT_WORDS.min ? 'Perluas artikel tanpa menambah fakta baru.' : 'Persingkat artikel, buang pengulangan.'
+    });
+    out.result.findings = findings;
+    if (String(out.result.publishingReadiness || '').toUpperCase() === 'READY') out.result.publishingReadiness = 'WARNINGS';
+  }
+  return out;
 }
 
 // --- Image Brief Agent (ai-agents/image-generator.md) ---
@@ -1732,8 +1802,8 @@ app.post("/api/gemini/strategy", async (req, res) => {
 // 5. Content Generator Route
 app.post("/api/gemini/generate-content", async (req, res) => {
   try {
-    const { businessData, seoStrategy } = req.body;
-    const { result, meta } = await runContentAgent(businessData, seoStrategy);
+    const { businessData, seoStrategy, objective } = req.body;
+    const { result, meta } = await runContentAgent(businessData, seoStrategy, undefined, objective);
     res.json({ ...result, _meta: meta });
   } catch (err: any) {
     console.error("Gemini Content Generation Error:", err);
@@ -1744,8 +1814,8 @@ app.post("/api/gemini/generate-content", async (req, res) => {
 // 6. Quality Control Route
 app.post("/api/gemini/validate", async (req, res) => {
   try {
-    const { campaign } = req.body;
-    const { result, meta } = await runAuditAgent(campaign);
+    const { campaign, objective } = req.body;
+    const { result, meta } = await runAuditAgent(campaign, objective);
     res.json({ ...result, _meta: meta });
   } catch (err: any) {
     console.error("Gemini Validation Error:", err);
@@ -2632,7 +2702,7 @@ app.post("/api/orchestrator/run", async (req, res) => {
   } else {
     const t0 = Date.now();
     try {
-      const { result, meta } = await runContentAgent(businessData, outputs.seoStrategy);
+      const { result, meta } = await runContentAgent(businessData, outputs.seoStrategy, undefined, objective);
       outputs.generatedContent = result;
       record('content', 'Content Generation', 'content', 'done', t0, {
         modelUsed: meta.modelUsed, modelName: meta.modelName,
@@ -2652,13 +2722,16 @@ app.post("/api/orchestrator/run", async (req, res) => {
   } else {
     const t0 = Date.now();
     try {
+      // The campaign is spread FIRST: it carries the previously applied seoStrategy and
+      // generatedContent, and spreading it last silently replaced the fresh draft with
+      // the old text, so the auditor judged the wrong content on every re-run.
       const auditInput = {
+        ...(campaign || {}),
         businessData,
         seoStrategy: outputs.seoStrategy,
-        generatedContent: outputs.generatedContent,
-        ...(campaign || {})
+        generatedContent: outputs.generatedContent
       };
-      const { result, meta } = await runAuditAgent(auditInput);
+      const { result, meta } = await runAuditAgent(auditInput, objective);
       outputs.audit = result;
       record('audit', 'Quality Control Audit', 'audit', 'done', t0, {
         modelUsed: meta.modelUsed, modelName: meta.modelName,
@@ -2726,7 +2799,7 @@ app.post("/api/orchestrator/run", async (req, res) => {
       const { result, meta } = await runContentAgent(businessData, outputs.seoStrategy, {
         previousContent: outputs.generatedContent,
         audit: auditBefore
-      });
+      }, objective);
       rewritten = result;
       record(`content-revisi-${revisionRound}`, `Content Revision ${revisionRound}`, 'content', 'done', tRewrite, {
         reason: `Audit sebelumnya ${auditBefore.publishingReadiness} (skor ${scoreBefore}); orchestrator meminta perbaikan.`,
@@ -2744,17 +2817,26 @@ app.post("/api/orchestrator/run", async (req, res) => {
     stage(`Audit ulang ke-${revisionRound}`);
     try {
       const { result: reaudit, meta } = await runAuditAgent({
+        ...(campaign || {}),
         businessData,
         seoStrategy: outputs.seoStrategy,
-        generatedContent: rewritten,
-        ...(campaign || {})
-      });
+        generatedContent: rewritten
+      }, objective);
 
       // Only keep the rewrite if the auditor actually rates it better. A revision that
       // scores worse is discarded, so the loop cannot degrade a draft.
       if (Array.isArray(reaudit?.findings)) reaudit.findings = findingsOf(reaudit);
       const scoreAfter = Number(reaudit.seoScore) || 0;
-      const improved = scoreAfter >= scoreBefore;
+      // Score alone is noisy (two audits of similar drafts can differ by a few
+      // points either way), so the length rule is checked directly: a rewrite that
+      // leaves the 500-1000 window when the previous draft was inside it is
+      // rejected, and one that brings a short draft into the window is kept even on
+      // an equal score.
+      const wordsBefore = countWords(outputs.generatedContent?.seoDescription);
+      const wordsAfter = countWords(rewritten?.seoDescription);
+      const lengthRegressed = wordsInRange(wordsBefore) && !wordsInRange(wordsAfter);
+      const lengthFixed = !wordsInRange(wordsBefore) && wordsInRange(wordsAfter);
+      const improved = !lengthRegressed && (scoreAfter >= scoreBefore || lengthFixed);
       if (improved) {
         outputs.generatedContent = rewritten;
         outputs.audit = reaudit;

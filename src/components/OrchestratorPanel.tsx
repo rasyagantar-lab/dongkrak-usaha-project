@@ -187,8 +187,9 @@ export const OrchestratorPanel: React.FC<OrchestratorPanelProps> = ({ campaign, 
           type="text"
           value={objective}
           onChange={e => setObjective(e.target.value)}
-          placeholder="Tujuan campaign"
-          className="w-full sm:w-64 text-xs bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-2 text-slate-100 placeholder:text-slate-600 focus:ring-2 focus:ring-sky-500 focus:outline-none"
+          placeholder="Tujuan & instruksi untuk semua agent"
+          title="Diteruskan ke agent Plan, Strategi, Keyword, Konten, dan Audit. Contoh: tonjolkan garansi; artikel sekitar 700 kata."
+          className="w-full sm:w-72 text-xs bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-2 text-slate-100 placeholder:text-slate-600 focus:ring-2 focus:ring-sky-500 focus:outline-none"
         />
         <button
           type="button"
