@@ -91,7 +91,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ onReloadCampaigns }) =
   };
 
   return (
-    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
+    <div className="du-card bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
       <div className="flex items-start gap-3">
         <div className="w-9 h-9 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
           <DatabaseBackup className="w-4.5 h-4.5" />

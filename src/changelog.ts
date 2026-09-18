@@ -14,9 +14,19 @@ export interface ChangelogEntry {
   items: string[];
 }
 
-export const APP_VERSION = '2.8';
+export const APP_VERSION = '2.9';
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '2.9',
+    date: '2026-09-19',
+    title: 'Tema Persona (beta) — pilih di Koneksi',
+    items: [
+      'Tab Koneksi → Tampilan: pilih "Persona" untuk tampilan hitam-merah-putih bergaya menu Persona 5 (huruf potongan, kartu bertepi sobek, nav miring). Tampilan standar tetap default dan tidak berubah.',
+      'Tahap 1 dari 3: fondasi warna, huruf, bentuk, dan nav. Tahap berikutnya: pemandu di pojok layar, lalu kanvas orchestrator & isi tiap tab.',
+      'Pilihan tersimpan di browser masing-masing; semua fungsi sama di kedua tampilan.'
+    ]
+  },
   {
     version: '2.8',
     date: '2026-09-18',

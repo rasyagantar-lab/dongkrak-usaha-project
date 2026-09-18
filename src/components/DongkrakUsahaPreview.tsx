@@ -19,7 +19,7 @@ export const DongkrakUsahaPreview: React.FC<DongkrakUsahaPreviewProps> = ({
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="du-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <span className="text-xs font-bold tracking-wider text-blue-600 uppercase bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100">
             DongkrakUsaha Form Preview
@@ -38,7 +38,7 @@ export const DongkrakUsahaPreview: React.FC<DongkrakUsahaPreviewProps> = ({
         </button>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+      <div className="du-card bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
         <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 font-bold text-slate-700 flex items-center gap-2">
           PRODUK input
         </div>

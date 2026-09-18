@@ -77,7 +77,7 @@ export const PublishingHistory: React.FC = () => {
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Header Banner */}
-      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="du-card bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
             <History className="w-5 h-5 text-blue-600" />
@@ -98,7 +98,7 @@ export const PublishingHistory: React.FC = () => {
       </div>
 
       {/* Search Bar */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center gap-3">
+      <div className="du-card bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center gap-3">
         <Search className="w-4 h-4 text-slate-400" />
         <input
           type="text"

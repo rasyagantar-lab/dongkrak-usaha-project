@@ -123,7 +123,7 @@ export const NodeInspector: React.FC<InspectorProps> = ({
   if (!node) return null;
 
   return (
-    <aside className="flex flex-col h-full bg-slate-900 border-l border-slate-800 text-slate-200">
+    <aside className="du-dark flex flex-col h-full bg-slate-900 border-l border-slate-800 text-slate-200">
       <div className="flex items-start justify-between gap-3 p-4 border-b border-slate-800">
         <div className="min-w-0">
           <div className="text-sm font-bold text-white">{node.label}</div>

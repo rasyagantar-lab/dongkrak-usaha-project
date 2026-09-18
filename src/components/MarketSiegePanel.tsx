@@ -279,7 +279,7 @@ export const MarketSiegePanel: React.FC<MarketSiegePanelProps> = ({ campaigns, o
       )}
 
       {/* Step 1: draft */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs space-y-3">
+      <div className="du-card bg-white border border-slate-200 rounded-xl p-4 shadow-xs space-y-3">
         <h3 className="text-sm font-bold text-slate-800">1. Buat Draft per Area (gratis, tanpa AI)</h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -328,7 +328,7 @@ export const MarketSiegePanel: React.FC<MarketSiegePanelProps> = ({ campaigns, o
       </div>
 
       {/* Step 2: select + realise */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs space-y-3">
+      <div className="du-card bg-white border border-slate-200 rounded-xl p-4 shadow-xs space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-bold text-slate-800">2. Pilih &amp; Realisasikan (memakai AI)</h3>

@@ -325,7 +325,7 @@ export const VisualAssetStudio: React.FC<VisualAssetStudioProps> = ({ campaign, 
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Step 1: base photo */}
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
+        <div className="du-card bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-bold text-slate-800">1. Foto Dasar Kategori</h3>
             <span className="text-2xs font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md border border-slate-200">
@@ -415,7 +415,7 @@ export const VisualAssetStudio: React.FC<VisualAssetStudioProps> = ({ campaign, 
         </div>
 
         {/* Step 2: caption */}
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
+        <div className="du-card bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-bold text-slate-800">2. Caption Listing</h3>
             <button
@@ -482,7 +482,7 @@ export const VisualAssetStudio: React.FC<VisualAssetStudioProps> = ({ campaign, 
 
       {/* Step 3: result */}
       {result && (
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
+        <div className="du-card bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-bold text-slate-800">3. Hasil</h3>
             <span className="text-2xs text-slate-500">

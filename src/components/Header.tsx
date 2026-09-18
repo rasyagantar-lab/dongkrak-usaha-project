@@ -2,6 +2,7 @@ import React from 'react';
 import { Globe, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 import { Campaign, DongkrakUsahaConnectionConfig } from '../types';
 import { APP_VERSION } from '../changelog';
+import { CutoutText } from '../ui/CutoutText';
 
 // Navigation lives in BottomNav now; the header is the identity strip + campaign picker.
 interface HeaderProps {
@@ -66,9 +67,9 @@ export const Header: React.FC<HeaderProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-bold text-slate-900 tracking-tight">
-                DongkrakUsaha AI Marketing Suite
+                <CutoutText text="DongkrakUsaha AI Marketing Suite" />
               </h1>
-              <span className="bg-blue-50 text-blue-700 text-2xs font-semibold px-2 py-0.5 rounded-md border border-blue-200">
+              <span className="du-badge du-badge-red bg-blue-50 text-blue-700 text-2xs font-semibold px-2 py-0.5 rounded-md border border-blue-200">
                 v{APP_VERSION}
               </span>
             </div>

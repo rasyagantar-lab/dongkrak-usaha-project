@@ -70,7 +70,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
     const { error } = this.state;
     if (!error) return <React.Fragment key={this.state.attempt}>{this.props.children}</React.Fragment>;
     return (
-      <div className="max-w-2xl mx-auto my-8 rounded-xl border border-rose-200 bg-rose-50 p-5 space-y-3">
+      <div className="du-card max-w-2xl mx-auto my-8 rounded-xl border border-rose-200 bg-rose-50 p-5 space-y-3">
         <div className="flex items-start gap-2.5">
           <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
           <div className="min-w-0">

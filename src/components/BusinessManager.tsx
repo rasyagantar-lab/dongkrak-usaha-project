@@ -115,7 +115,7 @@ export const BusinessManager: React.FC<BusinessManagerProps> = ({
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Header Info Banner */}
-      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="du-card bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
             <Building2 className="w-5 h-5 text-blue-600" />
@@ -166,7 +166,7 @@ export const BusinessManager: React.FC<BusinessManagerProps> = ({
       {/* Main Form Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Basic Information */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
+        <div className="du-card bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
           <h3 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">
             Informasi Dasar Bisnis
           </h3>
@@ -244,7 +244,7 @@ export const BusinessManager: React.FC<BusinessManagerProps> = ({
         </div>
 
         {/* Contact & Location */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
+        <div className="du-card bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
           <h3 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">
             Kontak & Lokasi Bisnis
           </h3>
@@ -339,7 +339,7 @@ export const BusinessManager: React.FC<BusinessManagerProps> = ({
       {/* Products & Target Cities Section */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Products & Services */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-3">
+        <div className="du-card bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-3">
           <h3 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">
             Produk & Layanan Utama
           </h3>
@@ -377,7 +377,7 @@ export const BusinessManager: React.FC<BusinessManagerProps> = ({
         </div>
 
         {/* Target Cities */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-3">
+        <div className="du-card bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-3">
           <h3 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">
             Kota & Area Target Pemasaran
           </h3>
@@ -414,7 +414,7 @@ export const BusinessManager: React.FC<BusinessManagerProps> = ({
       </div>
 
       {/* Image Gallery URLs */}
-      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-3">
+      <div className="du-card bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-3">
         <h3 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">
           Galeri Foto Usaha (Image URLs)
         </h3>

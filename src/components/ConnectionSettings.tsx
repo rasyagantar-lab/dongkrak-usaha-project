@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { DongkrakUsahaConnectionConfig } from '../types';
 import { BackupPanel } from './BackupPanel';
+import { ThemePicker } from './ThemePicker';
 
 interface ConnectionSettingsProps {
   connectionConfig: DongkrakUsahaConnectionConfig;
@@ -50,9 +51,10 @@ export const ConnectionSettings: React.FC<ConnectionSettingsProps> = ({
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <BackupPanel onReloadCampaigns={onReloadCampaigns} />
+      <ThemePicker />
 
       {/* Banner */}
-      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="du-card bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
             <Settings className="w-5 h-5 text-blue-600" />
@@ -107,7 +109,7 @@ export const ConnectionSettings: React.FC<ConnectionSettingsProps> = ({
 
       {/* Active Account Status or Setup Form */}
       {isConnected ? (
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-5">
+        <div className="du-card bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-5">
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-lg">
@@ -160,7 +162,7 @@ export const ConnectionSettings: React.FC<ConnectionSettingsProps> = ({
           </div>
         </div>
       ) : (
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-5">
+        <div className="du-card bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-5">
           <div className="border-b border-slate-100 pb-3">
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
               <Key className="w-4 h-4 text-blue-600" />
@@ -206,7 +208,7 @@ export const ConnectionSettings: React.FC<ConnectionSettingsProps> = ({
       )}
 
       {/* Extra Workflow Helper Tools */}
-      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-4">
+      <div className="du-card bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-4">
         <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
           <Zap className="w-4 h-4 text-blue-600" />
           Workflow Auto-Fill Assistant & Export

@@ -104,7 +104,9 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab })
               type="button"
               onClick={() => setActiveTab(item.id)}
               aria-current={isActive ? 'page' : undefined}
-              className={`relative z-10 flex-1 min-w-[64px] sm:min-w-0 flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-2 px-2 sm:px-3 my-2 rounded-xl text-2xs sm:text-xs font-semibold whitespace-nowrap select-none cursor-pointer transition-colors duration-200 active:scale-95 motion-reduce:active:scale-100 ${
+              data-active={isActive ? 'true' : 'false'}
+              data-guide={'nav.' + item.id}
+              className={`du-nav-item relative z-10 flex-1 min-w-[64px] sm:min-w-0 flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-2 px-2 sm:px-3 my-2 rounded-xl text-2xs sm:text-xs font-semibold whitespace-nowrap select-none cursor-pointer transition-colors duration-200 active:scale-95 motion-reduce:active:scale-100 ${
                 isActive ? 'text-white' : 'text-slate-500 hover:text-slate-900'
               }`}
             >
@@ -122,7 +124,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab })
                 )}
               </span>
               <span className="leading-none">
-                {item.num ? <span className={`hidden sm:inline ${isActive ? 'text-blue-100' : 'text-slate-400'}`}>{item.num}. </span> : null}
+                {item.num ? <span className={`du-nav-num hidden sm:inline ${isActive ? 'text-blue-100' : 'text-slate-400'}`}>{item.num}. </span> : null}
                 <span className="sm:hidden">{item.short}</span>
                 <span className="hidden sm:inline">{item.label}</span>
               </span>

@@ -188,7 +188,7 @@ export const OrchestratorPanel: React.FC<OrchestratorPanelProps> = ({ campaign, 
   // enforces. It answers "did it understand me?" before a single call is spent.
   const readRule = useMemo(() => parseLengthRule(objective), [objective]);
   const toolbar = (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-2.5 sm:p-3 space-y-2.5 max-w-3xl">
+    <div className="du-dark rounded-xl border border-slate-800 bg-slate-900/90 p-2.5 sm:p-3 space-y-2.5 max-w-3xl">
       <div className="flex flex-col sm:flex-row sm:items-center gap-2">
         <div className="min-w-0 flex-1">
           <div className="text-3xs text-slate-500 uppercase tracking-wider">Campaign</div>

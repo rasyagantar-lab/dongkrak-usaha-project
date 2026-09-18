@@ -1000,7 +1000,7 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Top Banner */}
-      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="du-card bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -1100,7 +1100,7 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
       )}
 
       {/* Active Campaign Info Header */}
-      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="du-card bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <span className="text-3xs font-bold uppercase text-slate-400 tracking-wider">Active Campaign</span>
           <h3 className="text-base font-extrabold text-slate-900">{activeCampaign.businessData.name}</h3>
@@ -1150,7 +1150,7 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
       {publisherMode === 'EXTENSION' && (
         <div className="space-y-6">
           {/* 4 Distinct Connection Status Cards */}
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+          <div className="du-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 pb-3">
               <div>
                 <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
@@ -1614,7 +1614,7 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
           )}
 
           {/* DEVELOPER FIELD AUDIT & PROVENANCE PANEL */}
-          <div className="bg-slate-950 text-slate-100 p-5 rounded-xl border border-slate-800 space-y-4">
+          <div className="du-dark du-card bg-slate-950 text-slate-100 p-5 rounded-xl border border-slate-800 space-y-4">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-800 pb-3">
               <div>
                 <div className="flex items-center gap-2">
@@ -1746,7 +1746,7 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
           </div>
 
           {/* Form Discovery Inspection Results */}
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+          <div className="du-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
             <div className="flex justify-between items-center border-b border-slate-100 pb-3">
               <div>
                 <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
@@ -1845,7 +1845,7 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
 
       {/* MANUAL ASSIST MODE */}
       {publisherMode === 'MANUAL' && (
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-4">
+        <div className="du-card bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-4">
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4 space-y-4 text-xs">
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 mb-2">
               <h4 className="font-bold text-slate-800 flex items-center gap-2">
@@ -1981,7 +1981,7 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
 
       {/* EXPORT MODE */}
       {publisherMode === 'EXPORT' && (
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-4">
+        <div className="du-card bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-4">
           <div>
             <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
               <Download className="w-4 h-4 text-emerald-600" />
