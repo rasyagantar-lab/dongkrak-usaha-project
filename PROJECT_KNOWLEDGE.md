@@ -733,6 +733,18 @@ Implementation (`server/firestoreTransport.ts` new; `server/storage.ts` refactor
 
 Also committed in the same batch: one self-improvement line the Strategy agent appended to `ai-agents/campaign-strategy.md` during the 2026-09-18 test run. Those runtime lines are the contract-growth mechanism (see `ai-agents/*.md` "Self-Improvement Rule"); they are committed as they appear, not reverted.
 
+## Persona Theme, Stage 0: Visual Dictionary Written, Awaiting Owner Confirmation (2026-09-19)
+
+**Request (owner):** an optional, selectable UI theme modelled on Persona 5's interface -- "menyeluruh dan akurat", from the tabs to the orchestrator canvas -- plus a guide character (Mitsuru Kirijo, owner-supplied portraits: idle / speaking) in a corner who explains whatever the cursor points at, in a P5-style dialogue box. The current UI stays the default; the theme is chosen in Koneksi.
+
+**Decisions taken with the owner:** Mitsuru's portraits are the owner's assets and the owner's IP risk (warned: Atlus/SEGA, product meant for sale); the developer places them and never fetches or generates Atlus art; name/assets/voice live in one file for a later swap. References: the owner's site was blocked (403) and the OneDrive folder holds one file, so the dictionary was built from independent sources (Suto interview, three UI analyses, Art of the Title, p5ui archive) plus that one calendar screen; owner screenshots enrich it. Staged delivery with a confirmation gate per stage. Guide hidden below 1024 px.
+
+**Why it is feasible "to the root":** Tailwind v4 compiles utilities to CSS variables, so redefining `--color-*`, `--radius-*`, `--shadow-*`, `--font-*` under `[data-theme="persona"]` retints all 924 colour utilities in 21 components at once; shape (skew, torn polygons, halftone) and motion are a second layer on shared primitives and key surfaces.
+
+**Stage 0 output:** `THEME_PERSONA.md` -- the design contract: direction contract (six blocks), tokens with the Tailwind variable mapping, typography (Anton display, bundled; cutout treatment only on short titles; Inter body), shapes, the motion language (12 app events with durations/easing, transform/opacity only, reduce-motion off), P5 screen -> app surface mapping, status semantics that never rely on colour alone, accessibility/performance floor, and what stays untouched (canvas motion policy, `canvasGraph.ts`, agent contracts). Method: impeccable `new-work` with the world pinned by the brief (no direction roll), colour strategy Committed.
+
+**Gate:** no code until the owner confirms the dictionary. Then Stage 1 (theme foundation + chrome, default pixel-identical), Stage 2 (guide), Stage 3 (deep surfaces incl. the canvas), each verified and confirmed.
+
 ## Owner Confirms Bug 6 Closed; "1.900 Kata" Was 1.917 Karakter; Listing Copy Retired (2026-09-19)
 
 Owner report after rest: (1) extension reports 1-2 resolved on the real site (Bug 6 fix confirmed by the owner). (2) "The content agent reports ~1.900 words but the Preview says otherwise." Screenshots showed the instruction had been read as `1.800–2.200 karakter (instruksi operator)`, the Konten node measured 257 kata · 16 kalimat · 1.917 karakter, and the pasted article had the six sub-headed sections in `seoDescription` with a separate 134-char meta -- the agent obeyed. The Preview showed an older text because the listing copy was never rebuilt: Bug 7 above. (3) Next: the owner wants to plan an "ultimate UI rework".
