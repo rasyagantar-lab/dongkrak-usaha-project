@@ -53,6 +53,7 @@ FINISH: unreviewed and unfinished sampai tinjauan `critique` + `polish` tiap ger
 | `--p5-white` | `#FFFFFF` | kertas/kartu, teks di hitam |
 | `--p5-black-2` | `#161616` | hitam kedua: zebra tabel, input, kartu bertumpuk (satu langkah, tidak lebih) |
 | `--p5-grey` | `#8A8A8A` | teks nonaktif, placeholder (satu-satunya abu) |
+| `--p5-yellow` | `#F2DD3C` | HANYA momen hasil: banner COMPLETE, nilai yang disorot (skor naik), stempel "naik level" -- mengikuti layar Level Up / Item P5; tidak pernah untuk UI biasa |
 | `--p5-halftone` | `radial-gradient(#ffffff22 1px, transparent 1.4px) 0 0/6px 6px` | tekstur latar hitam, statis |
 | `--p5-shadow` | `6px 6px 0 var(--p5-red)` | bayangan keras kartu/tombol (merah di atas hitam; tanpa blur) |
 | `--p5-skew` | `-7deg` | kemiringan panel & label |
@@ -92,13 +93,23 @@ teks tugas selalu putih-di-hitam >= 14 px, tidak pernah merah-di-hitam untuk bod
 
 - Panel/kartu: `clip-path: polygon(...)` 6-8 titik dengan satu sudut "sobek" (1-2 gigi),
   kemiringan `-7deg` pada wadah, isi di-counter-skew `+7deg` supaya teks tegak.
-- Label/tag: blok hitam miring dengan teks putih kapital; tag aktif merah.
-- Garis: 3 px hitam pekat; pemisah bagian = garis diagonal merah pendek.
-- Tombol: blok merah miring, teks putih Anton, bayangan keras; hover: blok hitam menyapu dari
-  kiri di belakang teks; nonaktif: abu tunggal tanpa bayangan.
-- Input: kertas putih, garis 3 px hitam, fokus = garis merah + label "berstempel".
-- Tabel/daftar: baris zebra kertas/kertas-kedua, kolom pertama label hitam miring.
+- Label/tag: blok putih miring dengan teks hitam kapital (kontras di atas hitam); tag aktif merah dengan teks putih.
+- Garis: 3 px putih; pemisah bagian = garis diagonal merah pendek.
+- Tombol: blok merah miring, teks putih Anton, bayangan keras putih; hover: blok putih menyapu dari
+  kiri di belakang teks (teks jadi hitam); nonaktif: abu tunggal tanpa bayangan.
+- Input: hitam-kedua, teks putih, garis 3 px putih, fokus = garis merah + label "berstempel".
+- Tabel/daftar: baris zebra hitam/hitam-kedua, kolom pertama label putih miring, baris aktif merah.
 - Ikon: lucide tetap (garis 2 px), diberi latar blok hitam/merah kecil supaya tidak "tipis".
+- **Garis & pita (dari layar Level Up / Item, referensi pemilik 2026-09-19):** garis P5 bukan
+  kurva -- pita merah lebar berpotongan diagonal dengan sudut patah tajam (zigzag/petir) di atas
+  hitam. Edge kanvas orchestrator dirender sebagai polyline bersegmen lurus dengan satu patahan
+  (bukan bezier), merah tebal 6 px, garis putih 2 px di dalamnya saat aktif, ujung terpotong
+  miring; partikel = bintang/topeng putih kecil. Latar hasil = 2-3 pita merah diagonal statis
+  (SVG polygon), tidak beranimasi terus.
+- Medali cipratan tinta (SVG blot hitam + garis putih) sebagai bingkai portrait pemandu dan
+  ikon node kanvas.
+- Konfeti ikon (topeng/bintang) hanya pada banner hasil, satu kali, <= 12 sprite,
+  transform/opacity, stagger 30 ms.
 
 ## Bahasa gerak (durasi/easing mengikat; transform/opacity saja; mati pada reduce-motion)
 
@@ -126,10 +137,11 @@ elemen, `will-change` permanen. Kanvas orchestrator tetap tunduk pada kebijakan 
 |---|---|---|
 | Menu utama / pause | nav bawah, header | item aktif blok merah miring beranomor besar, sisanya putih-di-hitam; siluet ikon |
 | Kalender / ganti hari | transisi tab; penanda tanggal Riwayat | angka bertumpuk miring, satu merah sebagai fokus |
+| Layar Item (kartu item) | NodeInspector, kartu node | kotak hitam miring bergaris putih, nama disorot kuning, ikon blot di kiri |
 | Kotak dialog berportrait | pemandu Mitsuru | kotak hitam bertepi sobek, tag nama merah, portrait menyembul di luar kotak |
 | Daftar (Confidant/toko) | Riwayat, tabel field Publish, daftar campaign | baris zebra, kolom pertama label hitam miring, baris aktif merah |
 | Panel status Persona | kartu, NodeInspector, JobTray | judul potongan, blok data bertumpuk, garis diagonal |
-| Layar hasil pertempuran | banner COMPLETE orchestrator | judul besar meluncur, angka bertumpuk |
+| Layar hasil (Level Up / Item) | banner COMPLETE orchestrator, skor naik | pita merah diagonal patah, judul potongan kuning beroutline hitam meluncur, medali portrait, konfeti ikon sekali, panah "Next" miring |
 | "Take Your Time" / loading | splash, tunggu run | siluet + satu baris teks berjalan, tanpa spinner bulat |
 
 ## Status (tidak boleh bergantung warna saja)
