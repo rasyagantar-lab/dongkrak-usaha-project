@@ -48,7 +48,12 @@
 @media (min-width: 640px) { .du-tray { bottom: calc(var(--du-bottom-nav, 0px) + 12px); } }
 
 /* ---- Bottom navigation + shared motion utilities (2026-09-15) ---- */
-:root { --du-bottom-nav: 60px; }
+:root {
+  --du-bottom-nav: 60px;
+  /* Orchestrator canvas colours; persona.css overrides them under its theme. */
+  --du-edge-idle: #334155; --du-edge-done: #10b981; --du-edge-active: #38bdf8; --du-edge-loop: #f59e0b;
+  --du-particle: #e0f2fe; --du-canvas-panel: #0f172a;
+}
 .du-bottom-nav {
   height: calc(var(--du-bottom-nav) + env(safe-area-inset-bottom, 0px));
   padding-bottom: env(safe-area-inset-bottom, 0px);

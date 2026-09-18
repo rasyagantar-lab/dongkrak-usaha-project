@@ -6,6 +6,7 @@ import {
   Minimize2, Crosshair, Zap, ZapOff, ArrowRightLeft
 } from 'lucide-react';
 import { NODES, NODE_H, NODE_W, layout, type GraphState, type LaidOutNode, type NodeStatus } from './canvasGraph';
+import { useTheme } from '../../theme/useTheme';
 
 /*
   The pipeline as a machine you can look at: a dark, pannable, zoomable canvas where
@@ -43,7 +44,27 @@ const STATUS_LABEL: Record<NodeStatus, string> = {
   idle: 'menunggu', running: 'bekerja', done: 'selesai', failed: 'gagal', skipped: 'dilewati', waiting: 'butuh Anda'
 };
 
-const EDGE_TONE = { idle: '#334155', done: '#10b981', active: '#38bdf8', loop: '#f59e0b' };
+// Edge colours are theme variables (index.css sets the standard values, persona.css
+// its own), applied through style= because SVG presentation attributes cannot read
+// var(). The shapes are themed too: a theme may ask for P5 "slash" polylines instead
+// of the bezier the layout draws.
+const EDGE_TONE = { idle: 'var(--du-edge-idle)', done: 'var(--du-edge-done)', active: 'var(--du-edge-active)', loop: 'var(--du-edge-loop)' };
+
+// P5 lines are straight bands with one sharp break, not curves. Rebuilt from the
+// bezier's endpoints: horizontal - diagonal - horizontal (or vertical for wraps).
+const slashPath = (bezier: string): string => {
+  const nums = bezier.match(/-?\d+(\.\d+)?/g)?.map(Number) || [];
+  if (nums.length < 4) return bezier;
+  const [sx, sy] = [nums[0], nums[1]];
+  const [ex, ey] = [nums[nums.length - 2], nums[nums.length - 1]];
+  const dx = ex - sx, dy = ey - sy;
+  if (Math.abs(dy) > Math.abs(dx)) {
+    const my = sy + dy * 0.55;
+    return `M ${sx} ${sy} L ${sx} ${my - Math.sign(dy) * 18} L ${ex} ${my + Math.sign(dy) * 18} L ${ex} ${ey}`;
+  }
+  const x1 = sx + dx * 0.42, x2 = sx + dx * 0.58;
+  return `M ${sx} ${sy} L ${x1} ${sy} L ${x2} ${ey} L ${ex} ${ey}`;
+};
 
 const LOW_POWER_KEY = 'du-canvas-low-power';
 const readLowPower = (): boolean | null => {
@@ -242,6 +263,8 @@ export const AgentCanvas: React.FC<AgentCanvasProps> = ({
 
   const motionOn = isRunning && !lowPower;
   const activeSet = new Set(graph.activeEdges);
+  const [theme] = useTheme();
+  const shape = (p: string) => (theme === 'persona' ? slashPath(p) : p);
 
   const canvas = (
     <div
@@ -274,28 +297,28 @@ export const AgentCanvas: React.FC<AgentCanvasProps> = ({
                     finished edges too would look richer and mean less. */}
                 {active && (
                   <>
-                    <path d={e.path} stroke={tone} strokeWidth={10} fill="none" opacity={0.08} strokeLinecap="round" />
-                    <path d={e.path} stroke={tone} strokeWidth={5} fill="none" opacity={0.16} strokeLinecap="round" />
+                    <path d={shape(e.path)} style={{ stroke: tone }} strokeWidth={10} fill="none" opacity={0.08} strokeLinecap="round" />
+                    <path d={shape(e.path)} style={{ stroke: tone }} strokeWidth={5} fill="none" opacity={0.16} strokeLinecap="round" />
                   </>
                 )}
                 <path
-                  d={e.path}
-                  stroke={tone}
+                  d={shape(e.path)}
+                  style={{ stroke: tone }}
+                  className={active ? 'du-edge du-edge-flow' : 'du-edge'}
                   strokeWidth={active ? 2.2 : 1.6}
                   fill="none"
                   strokeLinecap="round"
                   strokeDasharray={e.advisory ? '5 6' : active ? '10 12' : undefined}
-                  className={active ? 'du-edge-flow' : undefined}
                   opacity={done || active ? 0.95 : 0.55}
                 />
                 {/* One packet per active edge: one hand-off is happening, so one dot
                     travels. A stream of dots would be decoration pretending to be data. */}
                 {active && (
-                  <circle r={4} fill="#e0f2fe" className="du-particle" style={{ offsetPath: `path('${e.path}')` } as React.CSSProperties} />
+                  <circle r={4} className="du-particle" style={{ fill: 'var(--du-particle)', offsetPath: `path('${shape(e.path)}')` } as React.CSSProperties} />
                 )}
                 {e.loop && graph.revisionRounds > 0 && (
                   <g transform={`translate(${e.midX}, ${e.midY})`}>
-                    <rect x={-36} y={-11} width={72} height={22} rx={11} fill="#0f172a" stroke={EDGE_TONE.loop} strokeWidth={1} opacity={0.95} />
+                    <rect x={-36} y={-11} width={72} height={22} rx={11} style={{ fill: 'var(--du-canvas-panel)', stroke: EDGE_TONE.loop }} strokeWidth={1} opacity={0.95} />
                     <text x={0} y={4} textAnchor="middle" fontSize={11} fill="#fcd34d" fontWeight={700}>revisi ×{graph.revisionRounds}</text>
                   </g>
                 )}
@@ -392,7 +415,8 @@ const NodeCard: React.FC<{
       style={{ left: node.x, top: node.y, width: NODE_W, height: NODE_H }}
       // The card is a fixed box on the canvas, so its content has to stay inside it:
       // flex column, clamped role line, status pinned to the bottom.
-      className={`absolute text-left rounded-xl border bg-slate-900/95 px-3 py-2 flex flex-col overflow-hidden transition-colors duration-200 cursor-pointer ${STATUS_RING[status]} ${
+      data-status={status}
+      className={`du-node absolute text-left rounded-xl border bg-slate-900/95 px-3 py-2 flex flex-col overflow-hidden transition-colors duration-200 cursor-pointer ${STATUS_RING[status]} ${
         selected ? 'ring-2 ring-sky-400/70' : 'hover:border-slate-500'
       } ${status === 'done' ? 'animate-du-node-land motion-reduce:animate-none' : ''}`}
     >
@@ -409,14 +433,14 @@ const NodeCard: React.FC<{
           <Icon className="w-4 h-4" />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-bold text-slate-100 truncate leading-tight">{node.label}</div>
+          <div className="du-node-title text-sm font-bold text-slate-100 truncate leading-tight">{node.label}</div>
           {/* Semantic zoom: at overview scale the role line is unreadable anyway, so
               the card keeps only what still carries meaning -- icon, name, status. */}
           {scale >= 0.78 && <div className="text-3xs text-slate-400 leading-snug line-clamp-2">{node.role}</div>}
         </div>
       </div>
       <div className="mt-auto flex items-center gap-1.5 pt-1">
-        <span className={`inline-flex items-center gap-1 text-3xs font-semibold ${STATUS_TEXT[status]}`}>
+        <span className={`du-node-status inline-flex items-center gap-1 text-3xs font-semibold ${STATUS_TEXT[status]}`}>
           {status === 'running' ? <RefreshCw className="w-3 h-3 animate-spin" />
             : status === 'done' ? <CheckCircle2 className="w-3 h-3" />
             : status === 'failed' ? <XCircle className="w-3 h-3" />

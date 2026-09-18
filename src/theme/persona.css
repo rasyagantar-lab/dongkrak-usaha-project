@@ -317,3 +317,68 @@
   :root[data-theme="persona"] .du-canvas-controls { right: auto; left: 1rem; }
   :root[data-theme="persona"] .du-canvas-progress { left: auto; right: 1rem; max-width: 40%; }
 }
+
+/* ---- warna keempat tidak ada: skala lain dipetakan ke merah/putih/hitam ---- */
+:root[data-theme="persona"] {
+  --color-violet-50: var(--p5-red-deep);  --color-violet-100: var(--p5-red-deep); --color-violet-200: #7A0B11; --color-violet-300: #7A0B11;
+  --color-violet-400: var(--p5-red);      --color-violet-500: var(--p5-red);      --color-violet-600: var(--p5-red);
+  --color-violet-700: var(--p5-red-soft); --color-violet-800: var(--p5-red-soft); --color-violet-900: var(--p5-red-soft); --color-violet-950: var(--p5-red-soft);
+  --color-purple-50: var(--p5-red-deep);  --color-purple-100: var(--p5-red-deep); --color-purple-200: #7A0B11; --color-purple-300: #7A0B11;
+  --color-purple-400: var(--p5-red);      --color-purple-500: var(--p5-red);      --color-purple-600: var(--p5-red);
+  --color-purple-700: var(--p5-red-soft); --color-purple-800: var(--p5-red-soft); --color-purple-900: var(--p5-red-soft);
+  --color-indigo-50: var(--p5-red-deep);  --color-indigo-100: var(--p5-red-deep); --color-indigo-200: #7A0B11; --color-indigo-300: #7A0B11;
+  --color-indigo-400: var(--p5-red);      --color-indigo-500: var(--p5-red);      --color-indigo-600: var(--p5-red);
+  --color-indigo-700: var(--p5-red-soft); --color-indigo-800: var(--p5-red-soft); --color-indigo-900: var(--p5-red-soft);
+  --color-cyan-50: var(--p5-black-2);     --color-cyan-100: var(--p5-black-2);    --color-cyan-200: var(--p5-white); --color-cyan-300: var(--p5-white);
+  --color-cyan-400: var(--p5-white);      --color-cyan-500: var(--p5-white);      --color-cyan-600: var(--p5-white);
+  --color-cyan-700: var(--p5-white);      --color-cyan-800: var(--p5-white);      --color-cyan-900: var(--p5-white);
+  --color-teal-50: var(--p5-black-2);     --color-teal-100: var(--p5-black-2);    --color-teal-200: var(--p5-white); --color-teal-300: var(--p5-white);
+  --color-teal-400: var(--p5-white);      --color-teal-500: var(--p5-white);      --color-teal-600: var(--p5-white);
+  --color-teal-700: var(--p5-white);      --color-teal-800: var(--p5-white);      --color-teal-900: var(--p5-white);
+  --color-green-50: var(--p5-black-2);    --color-green-100: var(--p5-black-2);   --color-green-200: var(--p5-white); --color-green-300: var(--p5-white);
+  --color-green-400: var(--p5-white);     --color-green-500: var(--p5-white);     --color-green-600: var(--p5-white);
+  --color-green-700: var(--p5-white);     --color-green-800: var(--p5-white);     --color-green-900: var(--p5-white);
+  --color-orange-50: var(--p5-red-deep);  --color-orange-100: var(--p5-red-deep); --color-orange-200: var(--p5-red-soft); --color-orange-300: var(--p5-red-soft);
+  --color-orange-400: var(--p5-red);      --color-orange-500: var(--p5-red);      --color-orange-600: var(--p5-red);
+  --color-orange-700: var(--p5-red-soft); --color-orange-800: var(--p5-red-soft); --color-orange-900: var(--p5-red-soft);
+  --color-yellow-50: var(--p5-black-2);   --color-yellow-100: var(--p5-black-2);  --color-yellow-200: var(--p5-yellow); --color-yellow-300: var(--p5-yellow);
+  --color-yellow-400: var(--p5-yellow);   --color-yellow-500: var(--p5-yellow);   --color-yellow-600: var(--p5-yellow);
+  --color-yellow-700: var(--p5-yellow);   --color-yellow-800: var(--p5-yellow);   --color-yellow-900: var(--p5-yellow);
+  --color-gray-50: var(--p5-black-2);     --color-gray-100: var(--p5-black-2);    --color-gray-200: #333333; --color-gray-300: #333333;
+  --color-gray-400: var(--p5-grey);       --color-gray-500: var(--p5-grey);       --color-gray-600: var(--p5-white);
+  --color-gray-700: var(--p5-white);      --color-gray-800: var(--p5-white);      --color-gray-900: var(--p5-white);
+
+  /* Kanvas orchestrator: sabetan merah bersudut patah, partikel putih, panel hitam. */
+  --du-edge-idle: #3A3A3A; --du-edge-done: var(--p5-white); --du-edge-active: var(--p5-red); --du-edge-loop: var(--p5-yellow);
+  --du-particle: var(--p5-white); --du-canvas-panel: var(--p5-black);
+}
+
+/* ---- kanvas orchestrator (Tahap 3a): garis sabetan, kartu node potongan ---- */
+:root[data-theme="persona"] .du-canvas { background-image: var(--p5-halftone); }
+:root[data-theme="persona"] .du-canvas .du-canvas-grid { opacity: 0; }
+:root[data-theme="persona"] .du-edge { stroke-linejoin: miter; stroke-linecap: square; stroke-width: 3px; }
+:root[data-theme="persona"] .du-edge.du-edge-flow { stroke-width: 6px; }
+:root[data-theme="persona"] .du-node {
+  background: var(--p5-black) !important;
+  border: var(--p5-line) solid var(--p5-white) !important;
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 10px, 100% 100%, 12px 100%, 0 calc(100% - 9px));
+  transition: none;
+}
+:root[data-theme="persona"] .du-node[data-status="running"] { border-color: var(--p5-red) !important; box-shadow: inset 0 0 0 2px var(--p5-red); }
+:root[data-theme="persona"] .du-node[data-status="done"] { border-color: var(--p5-white) !important; }
+:root[data-theme="persona"] .du-node[data-status="failed"] { background: var(--p5-red) !important; border-color: var(--p5-white) !important; }
+:root[data-theme="persona"] .du-node[data-status="idle"], :root[data-theme="persona"] .du-node[data-status="skipped"] { border-color: #555 !important; }
+:root[data-theme="persona"] .du-node-title {
+  font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 400; font-size: 15px;
+  color: var(--p5-white) !important;
+}
+:root[data-theme="persona"] .du-node-status {
+  font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 400;
+  padding: 1px 6px; transform: skewX(var(--p5-skew));
+  background: var(--p5-white); color: var(--p5-black) !important;
+}
+:root[data-theme="persona"] .du-node[data-status="running"] .du-node-status { background: var(--p5-red); color: var(--p5-white) !important; }
+:root[data-theme="persona"] .du-node[data-status="idle"] .du-node-status, :root[data-theme="persona"] .du-node[data-status="skipped"] .du-node-status { background: #555; color: var(--p5-white) !important; }
+:root[data-theme="persona"] .du-node[data-status="failed"] .du-node-status { background: var(--p5-black); color: var(--p5-white) !important; }
+/* Ikon node: blok hitam bergaris putih, bukan chip pastel. */
+:root[data-theme="persona"] .du-node > div > span:first-child { background: var(--p5-black) !important; border: 2px solid var(--p5-white); color: var(--p5-white) !important; border-radius: 0 !important; }
