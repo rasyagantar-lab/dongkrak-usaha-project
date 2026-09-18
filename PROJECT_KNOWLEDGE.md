@@ -713,6 +713,12 @@ Implementation (`server/firestoreTransport.ts` new; `server/storage.ts` refactor
 - OWNER DECISION (2026-09-17): feature closed here -- enough time spent. Accepted as-is: transport rest-unauthenticated with open rules on the two collections. Deferred, not forgotten: (a) operator restart-survival check, (b) Anonymous provider + request.auth != null rules. Do not reopen unless the owner asks or data actually goes missing.
 - What the hosted line can say next: green `via rest-anonymous` (done); green `via rest-unauthenticated` (works, but rules are open -- ask AI Studio to tighten to `request.auth != null` and enable Anonymous, then it flips to anonymous); red with the three attempts (rules deny both client paths -> fix rules / enable Anonymous in Firebase Console).
 
+## Extension Zip No Longer Drifts On Every Server Start (2026-09-18)
+
+`public/dongkrakusaha-publisher-extension.zip` is tracked, and `generateExtensionZipBuffer` in `server.ts` rewrites it at every startup. JSZip stamps each entry -- the six files AND the directory entry -- with "now", so the file changed by ~42 bytes per start with identical contents and sat in source control as a phantom edit after every `npm run dev`. Fixed by pinning `date: EXTENSION_ZIP_DATE` (local-time 2026-01-01, so the DOS timestamp is timezone-independent) on the files and on an explicitly created directory entry (`zip.folder()` reuses an existing entry, so it must be created before the call). **Verified:** two restarts 61 s apart produce the same SHA-1; the zip still lists 7 entries with one shared date. From now on a dirty zip means the extension sources really changed.
+
+Also committed in the same batch: one self-improvement line the Strategy agent appended to `ai-agents/campaign-strategy.md` during the 2026-09-18 test run. Those runtime lines are the contract-growth mechanism (see `ai-agents/*.md` "Self-Improvement Rule"); they are committed as they appear, not reverted.
+
 ## Canvas Follow-Up: Fullscreen Strip + White-Screen Net (2026-09-18)
 
 Owner's report the morning after the canvas shipped: (1) "Layar penuh" rendered as a thin black strip across the top of the tab; (2) sometimes, while the orchestrator is working, the whole page goes white and only a browser reload brings it back.

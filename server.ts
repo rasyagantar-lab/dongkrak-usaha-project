@@ -728,8 +728,18 @@ app.get("/api/health", (req, res) => {
 });
 
 // Extension Zip Generator Helper
+//
+// Entry timestamps are pinned: JSZip otherwise stamps every entry with "now", so the
+// tracked zip in public/ changed on every server start and showed up as a phantom
+// edit in source control. With a fixed date the file is byte-identical until the
+// extension sources actually change. Built from local time components so the DOS
+// timestamp is the same in every timezone the server runs in.
+const EXTENSION_ZIP_DATE = new Date(2026, 0, 1, 0, 0, 0);
 async function generateExtensionZipBuffer(): Promise<Buffer> {
   const zip = new JSZip();
+  // The directory entry is created explicitly so it carries the pinned date too;
+  // zip.folder() reuses an existing entry instead of stamping a new one.
+  zip.file("dongkrakusaha-publisher-extension/", null, { dir: true, date: EXTENSION_ZIP_DATE });
   const folder = zip.folder("dongkrakusaha-publisher-extension");
 
   const files = [
@@ -746,7 +756,7 @@ async function generateExtensionZipBuffer(): Promise<Buffer> {
     const filePath = path.join(process.cwd(), "public", "extension", file);
     if (fs.existsSync(filePath)) {
       const content = fs.readFileSync(filePath, "utf-8");
-      folder?.file(file, content);
+      folder?.file(file, content, { date: EXTENSION_ZIP_DATE });
     } else {
       console.error(`[Zip Server] Missing expected extension file: ${filePath}`);
     }
