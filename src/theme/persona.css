@@ -481,7 +481,10 @@
 }
 :root[data-theme="persona"] tbody tr { background: var(--p5-black-2); }
 :root[data-theme="persona"] tbody tr:nth-child(even) { background: #202020; }
-:root[data-theme="persona"] tbody tr > td:first-child { border-left: 4px solid var(--p5-white); font-family: var(--font-display); letter-spacing: 0.04em; }
+:root[data-theme="persona"] tbody tr > td:first-child { font-family: var(--font-display); letter-spacing: 0.04em; }
+/* Penanda baris: strip merah miring kecil (perangkat yang sama dengan judul bagian), bukan garis tepi. */
+:root[data-theme="persona"] tbody tr > td:first-child::before { content: ''; display: inline-block; width: 8px; height: 14px; margin-right: 8px; vertical-align: -2px; background: var(--p5-red); transform: skewX(var(--p5-skew)); }
+:root[data-theme="persona"] tbody tr:hover > td:first-child::before { background: var(--p5-black); }
 :root[data-theme="persona"] tbody tr > td:last-child { clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 100%, 0 100%); }
 :root[data-theme="persona"] tbody tr:hover { background: var(--p5-white); color: var(--p5-black); }
 :root[data-theme="persona"] tbody tr:hover td { color: var(--p5-black) !important; }
