@@ -1,6 +1,6 @@
 # THEME_PERSONA.md -- kontrak desain tema "Persona" (opsional, dipilih di tab Koneksi)
 
-Status: Tahap 0 (kamus visual) -- menunggu konfirmasi pemilik sebelum kode ditulis.
+Status: Tahap 0 dikonfirmasi pemilik 2026-09-19 (hitam penuh; potongan huruf diperluas; tanpa hijau). Tahap 1 berjalan.
 Dunia visual: bahasa antarmuka Persona 5 (Atlus, art director Masayoshi Suto), dipatuhi
 sebagai *gaya* di seluruh permukaan aplikasi. Aset karakter pemandu disediakan pemilik
 (lihat "Pemandu"); tidak ada aset Atlus yang diambil atau dihasilkan oleh pengembang.
@@ -25,17 +25,20 @@ Tema default ("standar") tidak berubah; tema ini hidup di bawah `[data-theme="pe
 THESIS: Aplikasi kerja yang tampil seperti *menu Phantom Thieves* -- setiap tab adalah layar
 menu P5, setiap kartu adalah potongan kertas yang dilempar ke meja, setiap status adalah
 stempel. Yang ditolak: dashboard SaaS bersudut bulat berwarna pastel dengan ikon garis tipis.
-OWN-WORLD: hitam pekat sebagai meja, putih sebagai kertas, satu merah crimson sebagai tinta
-yang mengisi bidang (nav aktif, judul, tag, garis tebal), tanpa warna keempat. Panel miring
--7 derajat, tepi sobek polygon, halftone titik di latar, garis 3 px, bayangan hitam keras tanpa
-blur, huruf display kapital potongan dengan outline hitam; body tetap bersih.
+OWN-WORLD (keputusan pemilik: hitam penuh): hitam pekat di mana-mana -- latar, kartu, input,
+tabel -- dengan teks putih; satu merah crimson sebagai tinta yang mengisi bidang (nav aktif,
+judul, tag, garis tebal, fokus); tanpa warna keempat. Kartu dibedakan dari latar oleh garis
+putih 3 px, tepi sobek, dan hitam-kedua (#161616) sebagai zebra. Panel miring -7 derajat,
+halftone titik di latar, bayangan keras putih-tipis/merah (tanpa blur), huruf display kapital
+potongan dengan outline; body tetap Inter.
 STORY: Operator masuk ke "markas": tahu di mana dirinya (tab menyala merah miring), apa yang
 sedang dikerjakan mesin (stempel status), dan siapa yang menemani (pemandu di pojok yang
 menjelaskan apa saja yang disorot). Tugas tetap tugas: form terbaca, tabel terbaca.
 FIRST VIEWPORT (tab Data Bisnis, 1440 px): header hitam dengan judul aplikasi potongan huruf,
-badge versi merah miring; konten di atas latar hitam ber-halftone; kartu form putih miring
-ringan dengan label hitam tebal; nav bawah = menu P5: item aktif blok merah miring dengan
-angka besar, lainnya putih di hitam; pemandu di kanan bawah di atas nav (desktop saja).
+badge versi merah miring; konten di atas latar hitam ber-halftone; kartu form hitam bergaris
+putih 3 px, miring ringan, label potongan huruf putih, input hitam bergaris putih dengan fokus
+merah; nav bawah = menu P5: item aktif blok merah miring dengan angka besar, lainnya putih di
+hitam; pemandu di kanan bawah di atas nav (desktop saja).
 FORM: bahasa antarmuka P5 dipatuhi apa adanya (dunia terkunci oleh brief); bukan hasil roll.
 FINISH: unreviewed and unfinished sampai tinjauan `critique` + `polish` tiap gerbang dan
 `audit` di gerbang akhir dinyatakan lulus dan pemilik mengonfirmasi.
@@ -48,35 +51,41 @@ FINISH: unreviewed and unfinished sampai tinjauan `critique` + `polish` tiap ger
 | `--p5-black` | `#0B0B0B` | meja/latar utama, kotak dialog, label |
 | `--p5-ink` | `#000000` | outline huruf, bayangan keras, garis |
 | `--p5-white` | `#FFFFFF` | kertas/kartu, teks di hitam |
-| `--p5-paper` | `#F4F1EA` | kertas kedua untuk tabel/zebra (satu langkah, tidak lebih) |
+| `--p5-black-2` | `#161616` | hitam kedua: zebra tabel, input, kartu bertumpuk (satu langkah, tidak lebih) |
 | `--p5-grey` | `#8A8A8A` | teks nonaktif, placeholder (satu-satunya abu) |
 | `--p5-halftone` | `radial-gradient(#ffffff22 1px, transparent 1.4px) 0 0/6px 6px` | tekstur latar hitam, statis |
-| `--p5-shadow` | `6px 6px 0 var(--p5-ink)` | bayangan keras kartu/tombol (tanpa blur) |
+| `--p5-shadow` | `6px 6px 0 var(--p5-red)` | bayangan keras kartu/tombol (merah di atas hitam; tanpa blur) |
 | `--p5-skew` | `-7deg` | kemiringan panel & label |
 | `--p5-line` | `3px` | tebal garis/border |
 
 Pemetaan ke variabel Tailwind v4 di bawah `[data-theme="persona"]` (satu lapisan, semua
-komponen ikut): `--color-white` -> kertas; `--color-slate-50..200` -> kertas & garis tipis;
-`--color-slate-300..500` -> abu tunggal; `--color-slate-600..950` -> hitam; `--color-blue-*`,
-`--color-sky-*` -> merah (aksi utama); `--color-emerald-*` -> putih-di-hitam (sukses ditandai
-bentuk & ikon, bukan hijau); `--color-amber-*` -> merah beroutline (peringatan); `--color-rose-*`
--> merah penuh (gagal); `--radius-*` -> 0; `--shadow-*` -> `--p5-shadow`.
+komponen ikut). Komponen TERANG (kartu putih, teks gelap) dibalik: `--color-white` -> hitam;
+`--color-slate-50/100` -> hitam-kedua; `--color-slate-200/300` -> garis `#333`;
+`--color-slate-400/500` -> abu tunggal; `--color-slate-600..950` -> putih (teks);
+`--color-blue-*`, `--color-sky-*` -> merah (aksi utama); `--color-emerald-*` -> putih (sukses
+ditandai bentuk & ikon, bukan hijau); `--color-amber-*` -> merah (peringatan, beroutline);
+`--color-rose-*` -> merah penuh (gagal); `--radius-*` -> 0; `--shadow-*` -> `--p5-shadow`.
+Komponen yang SUDAH GELAP (kanvas orchestrator, NodeInspector, toolbar kanvas, panel gelap
+Publish) diberi kelas `du-dark` pada wadahnya: di dalam scope itu variabel slate dikembalikan ke
+skala aslinya (hitam tetap hitam, teks terang tetap terang) dan hanya biru/sky/emerald/amber/rose
+yang dipetakan ke merah/putih. Di tema standar kelas `du-dark` tidak berefek.
 
 Strategi warna: **Committed** -- merah mengisi bidang (nav aktif, header bagian, tag), bukan
-aksen kecil; hitam & putih membagi sisa permukaan. Adegan fisik yang memutuskan gelap: empat
-anak PKL & pembimbing di ruang kantor siang hari di laptop 8 GB -- latar hitam boleh, tapi
-**semua teks tugas berdiri di kertas putih atau putih-di-hitam**, tidak pernah merah-di-hitam
-untuk body.
+aksen kecil; hitam mengisi sisanya, putih hanya untuk teks & garis. Pemilik memilih hitam
+penuh demi akurasi dengan kesadaran bahwa form/tabel panjang lebih melelahkan; jaminannya:
+teks tugas selalu putih-di-hitam >= 14 px, tidak pernah merah-di-hitam untuk body.
 
 ## Tipografi
 
 - Display (`--font-display`): **Anton** (bebas, dibundel di `public/fonts/`) -- berat, kondensasi,
   kapital; untuk judul tab, nama bagian, angka besar, label nav, tag nama pemandu.
-- Efek potongan fanzine hanya pada judul <= 12 huruf: komponen `CutoutText` memecah judul per
+- Efek potongan fanzine (keputusan pemilik: diperluas) pada judul tab, nama bagian, label form,
+  judul kartu, badge/status, angka statistik, label nav: komponen `CutoutText` memecah teks per
   huruf dengan rotasi deterministik +-3 derajat dan ukuran +-8 % (hash dari indeks, bukan acak),
-  `aria-label` utuh, `-webkit-text-stroke 2px` hitam + `text-shadow` bertumpuk sebagai outline.
-- Body tetap Inter (sudah dibundel): form, tabel, dialog pemandu, isi kartu. Tidak ada
-  potongan huruf pada teks yang dibaca.
+  `aria-label` utuh, `-webkit-text-stroke` + `text-shadow` bertumpuk sebagai outline. Batas
+  panjang 28 huruf; lebih dari itu dirender Anton polos tanpa potongan.
+- Tetap Inter, tanpa potongan (lantai keterbacaan yang tidak dinegosiasikan): paragraf, nilai
+  input, isi sel tabel, teks dialog pemandu, pesan error, deskripsi panjang.
 - Skala: judul tab 40/44, nama bagian 22/24 kapital, label 12/16 kapital berjarak 0.08em.
 
 ## Bentuk
