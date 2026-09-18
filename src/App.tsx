@@ -19,6 +19,9 @@ import { BottomNav } from './components/BottomNav';
 import { JobCenterProvider } from './jobs';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { GuideCompanion } from './guide/GuideCompanion';
+import { PersonaRail } from './theme/persona/PersonaRail';
+import { ScreenTitle } from './theme/persona/ScreenTitle';
+import { ResultBanner } from './theme/persona/ResultBanner';
 import { INITIAL_CAMPAIGNS } from './data/sampleBusinesses';
 import { Campaign, DongkrakUsahaConnectionConfig } from './types';
 
@@ -34,8 +37,12 @@ const TAB_LABELS: Record<string, string> = {
   'connection-settings': 'Koneksi', history: 'Riwayat'
 };
 
+const TAB_NUM: Record<string, number> = { business: 1, 'market-siege': 2, orchestrator: 3, 'visual-asset': 4, 'dongkrak-preview': 5, 'publishing-hub': 6 };
+
 const TabPanel: React.FC<{ id: string; active: string; children: React.ReactNode }> = ({ id, active, children }) => (
   <section hidden={active !== id} className="animate-du-panel-in motion-reduce:animate-none">
+    {/* Persona theme only: the P5 screen word; renders nothing in the standard theme. */}
+    <ScreenTitle num={TAB_NUM[id]} label={TAB_LABELS[id] || id} />
     {/* Per-tab boundary: a render error in one panel must not white-screen the whole
         app while a pipeline is running in another. */}
     <ErrorBoundary label={TAB_LABELS[id] || id}>{children}</ErrorBoundary>
@@ -349,7 +356,9 @@ export default function App() {
       <ModelStatusIndicator />
       <JobTray onNavigate={handleNavigateFromTray} />
       <BottomNav activeTab={activeTab} setActiveTab={goToTab} />
+      <PersonaRail activeTab={activeTab} setActiveTab={goToTab} />
       <GuideCompanion />
+      <ResultBanner />
     </div>
     </ErrorBoundary>
     </JobCenterProvider>

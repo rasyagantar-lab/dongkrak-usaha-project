@@ -166,3 +166,6 @@
   .du-edge-flow, .du-particle { animation: none; }
   .du-particle { opacity: 0.9; offset-distance: 60%; }
 }
+
+/* Long unbreakable strings (URLs in <code>) must wrap on phones instead of widening the page. */
+main code { overflow-wrap: anywhere; }

@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { Campaign, DongkrakUsahaConnectionConfig } from '../types';
 import { buildListingData } from '../lib/listingData';
+import { showResult } from '../theme/persona/ResultBanner';
 
 interface PublishingHubProps {
   campaigns: Campaign[];
@@ -702,6 +703,7 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
         if (autopostTimeoutRef.current) clearTimeout(autopostTimeoutRef.current);
         const result = event.data.payload || {};
         setAutopostResult(result);
+        if (result.success && event.data.type === 'DONGKRAK_SUBMIT_RESULT') showResult({ title: 'Terkirim', lines: [activeCampaign.businessData.name, 'Status: Submitted'] });
         setAutopostStatus(result.success
           ? (event.data.type === 'DONGKRAK_SUBMIT_RESULT'
             ? 'Submit terkirim dan tercatat sebagai Submitted. DongkrakUsaha baru menyediakan URL publik ~24 jam kemudian — isi manual di kolom di bawah setelah itu tersedia.'
@@ -1035,10 +1037,11 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
       </div>
 
       {/* Mode Selector */}
-      <div className="flex gap-2 p-1 bg-slate-100 rounded-lg w-max border border-slate-200">
+      <div className="du-tabs flex gap-2 p-1 bg-slate-100 rounded-lg w-max border border-slate-200">
         <button
           onClick={() => setPublisherMode('EXTENSION')}
-          className={`px-4 py-2 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${
+          data-active={publisherMode === 'EXTENSION' ? 'true' : 'false'}
+          className={`du-tab px-4 py-2 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${
             publisherMode === 'EXTENSION' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:bg-slate-200'
           }`}
         >
@@ -1047,8 +1050,9 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
         </button>
         <button
           onClick={() => setPublisherMode('MANUAL')}
+          data-active={publisherMode === 'MANUAL' ? 'true' : 'false'}
           data-guide="publish.mode"
-          className={`px-4 py-2 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${
+          className={`du-tab px-4 py-2 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${
             publisherMode === 'MANUAL' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:bg-slate-200'
           }`}
         >
@@ -1057,7 +1061,8 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
         </button>
         <button
           onClick={() => setPublisherMode('EXPORT')}
-          className={`px-4 py-2 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${
+          data-active={publisherMode === 'EXPORT' ? 'true' : 'false'}
+          className={`du-tab px-4 py-2 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${
             publisherMode === 'EXPORT' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:bg-slate-200'
           }`}
         >

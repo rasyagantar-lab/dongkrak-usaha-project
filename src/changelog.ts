@@ -24,7 +24,8 @@ export const CHANGELOG: ChangelogEntry[] = [
     items: [
       'Tab Koneksi → Tampilan: pilih "Persona" untuk tampilan hitam-merah-putih bergaya menu Persona 5 (huruf potongan, kartu bertepi sobek, nav miring). Tampilan standar tetap default dan tidak berubah.',
       'Pemandu di pojok kanan bawah (desktop): arahkan kursor ke tab, tombol, atau kotak agent — dia menjelaskan fungsinya dan fakta bagaimana bagian itu lahir. Bisa disembunyikan; pilihan tersimpan.',
-      'Tahap 2 dari 3 selesai. Berikutnya: kanvas orchestrator & isi tiap tab dengan gaya yang sama.',
+      'Struktur ikut berubah, bukan cuma warna: menu utama jadi rail kiri gaya P5 (desktop), tiap tab dibuka dengan judul raksasa di pita merah, panel besar miring, tabel berlajur seperti layar LOAD, dan momen hasil gaya Level Up saat run selesai atau listing terkirim.',
+      'Kanvas orchestrator: garis sabetan merah bersudut patah, kartu agent potongan hitam bergaris putih.',
       'Pilihan tersimpan di browser masing-masing; semua fungsi sama di kedua tampilan.'
     ]
   },

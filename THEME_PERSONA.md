@@ -20,6 +20,25 @@ Tema default ("standar") tidak berubah; tema ini hidup di bawah `[data-theme="pe
 - Kerangka kerja impeccable `new-work` (dunia terkunci oleh brief -> patuhi tata bahasanya;
   strategi warna Committed; kontrak arah enam blok).
 
+## Referensi terkunci (14 layar dari pemilik, 2026-09-19, folder lokal `Persona 5 UI Data Base/` -- tidak di-commit)
+
+| Layar | Yang dikunci untuk app |
+|---|---|
+| Title / LOAD GAME (siluet merah, judul potongan) | judul layar satu kata raksasa; siluet sebagai motif splash |
+| LOAD (tabel miring lajur abu/hitam, nomor besar kiri, pita merah) | tabel Riwayat & field Publish: header merah, lajur bergantian, kolom pertama Anton bergaris putih |
+| Take Your Time | tunggu run tanpa spinner bulat |
+| COMMAND (tangan Joker, kata bertumpuk diputar, item aktif merah) | rail kiri: kata potongan bertumpuk, rotasi per item, aktif blok merah menyabet ke konten |
+| PERSONA background (kartu miring, tag ARCANA) | panel detail / inspector |
+| TUTORIAL (tag tab hitam sobek, aktif putih) | pemilih mode Publish (`du-tabs`) |
+| CALENDAR (angka besar, hari ini merah; panel kanan Day/Night Job) | penanda tanggal Riwayat; transisi tab |
+| ORDER (kata raksasa kiri bawah, label merah/putih bertumpuk) | pola label aksi bertumpuk |
+| PERSONA skill list (header merah, daftar putih) | judul bagian dalam panel: strip merah di depan |
+| Location card (teks potongan putih beroutline hitam) | judul layar & tag lokasi |
+| TUTORIAL talking (panel putih sobek, kotak bicara hitam) | dialog pemandu |
+| Enemy speech bubble | ekor gelembung dialog pemandu (Tahap 3c) |
+| CONFIDANT rank-up (angka raksasa kuning, pita merah, strip label) | banner hasil COMPLETE / Terkirim |
+| Calendar day transition | angka bertumpuk miring |
+
 ## Direction contract
 
 THESIS: Aplikasi kerja yang tampil seperti *menu Phantom Thieves* -- setiap tab adalah layar

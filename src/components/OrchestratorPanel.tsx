@@ -7,6 +7,7 @@ import { NodeInspector, type HumanFinding } from './orchestrator/NodeInspector';
 import { deriveGraphState, type LedgerEntry } from './orchestrator/canvasGraph';
 import { parseLengthRule, describe as describeRule, type LengthRule, type Measured } from '../lib/lengthRule';
 import { buildListingData } from '../lib/listingData';
+import { showResult } from '../theme/persona/ResultBanner';
 
 /*
   The orchestrator tab is a canvas of the pipeline, not a stack of report blocks.
@@ -131,6 +132,17 @@ export const OrchestratorPanel: React.FC<OrchestratorPanelProps> = ({ campaign, 
     onUpdateCampaign({ ...next, dongkrakListingData: buildListingData(next, campaign.dongkrakListingData) });
     setApplied(true);
   };
+
+  // P5 result moment (Persona theme only; the banner ignores the event elsewhere): once per run.
+  const celebrated = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (!run || run.pipelineStatus !== 'COMPLETE' || celebrated.current === run.runId) return;
+    celebrated.current = run.runId;
+    const score = run.outputs?.audit?.seoScore;
+    const lines = [`${run.summary.done}/${run.summary.total} tahap · ${(run.durationMs / 1000).toFixed(0)} detik`];
+    if (run.outputs?.audit?.publishingReadiness) lines.push(`Siap publish: ${run.outputs.audit.publishingReadiness}`);
+    showResult({ title: 'Selesai', number: typeof score === 'number' ? score : undefined, numberLabel: 'Skor SEO', lines });
+  }, [run]);
 
   const canApply = !!(run?.outputs.seoStrategy || run?.outputs.generatedContent || run?.outputs.audit);
 

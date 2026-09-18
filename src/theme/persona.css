@@ -382,3 +382,153 @@
 :root[data-theme="persona"] .du-node[data-status="failed"] .du-node-status { background: var(--p5-black); color: var(--p5-white) !important; }
 /* Ikon node: blok hitam bergaris putih, bukan chip pastel. */
 :root[data-theme="persona"] .du-node > div > span:first-child { background: var(--p5-black) !important; border: 2px solid var(--p5-white); color: var(--p5-white) !important; border-radius: 0 !important; }
+
+/* ======================= Tahap 3b: struktur ======================= */
+
+/* Rail kiri = menu COMMAND: kata potongan bertumpuk, tiap kata sedikit diputar,
+   item aktif di blok merah miring yang menyabet ke area konten. */
+:root[data-theme="persona"] .du-rail {
+  background: var(--p5-black);
+  background-image: var(--p5-halftone);
+  border-right: var(--p5-line) solid var(--p5-white);
+}
+:root[data-theme="persona"] .du-rail-item {
+  font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.06em; font-size: 15px;
+  color: var(--p5-white);
+  transform: rotate(calc(-1.5deg + (var(--i) * 0.5deg))) translateX(calc(var(--i) * 2px));
+  transition: transform 120ms var(--p5-ease);
+}
+:root[data-theme="persona"] .du-rail-item:hover { transform: rotate(0deg) translateX(8px); }
+:root[data-theme="persona"] .du-rail-num {
+  font-family: var(--font-display); font-size: 30px; line-height: 1; width: 1.1em; text-align: right;
+  color: var(--p5-white); -webkit-text-stroke: 1px var(--p5-ink);
+}
+:root[data-theme="persona"] .du-rail-item[data-active="true"] {
+  transform: rotate(0deg) translateX(10px) scale(1.06);
+  color: var(--p5-white);
+}
+:root[data-theme="persona"] .du-rail-item[data-active="true"]::before {
+  content: ''; position: absolute; inset: 0 -40px 0 0; z-index: -1;
+  background: var(--p5-red);
+  clip-path: polygon(0 0, calc(100% - 26px) 0, 100% 50%, calc(100% - 20px) 100%, 0 100%);
+  box-shadow: 4px 4px 0 var(--p5-white);
+}
+:root[data-theme="persona"] .du-rail-item[data-active="true"] .du-rail-num { color: var(--p5-yellow); font-size: 36px; }
+:root[data-theme="persona"] .du-rail-count {
+  margin-left: auto; min-width: 18px; padding: 0 5px; font-family: var(--font-display); font-size: 11px;
+  background: var(--p5-white); color: var(--p5-black); transform: skewX(var(--p5-skew));
+}
+@media (min-width: 1024px) {
+  :root[data-theme="persona"] nav[aria-label="Navigasi utama"] { display: none; }
+  :root[data-theme="persona"] main { padding-left: calc(228px + 2rem); }
+  :root[data-theme="persona"] footer { padding-left: 228px; }
+  :root[data-theme="persona"] body { --du-bottom-nav: 0px; }
+}
+
+/* Judul layar: satu kata raksasa potongan di kiri atas, pita merah diagonal di belakang. */
+:root[data-theme="persona"] .du-screen-title { min-height: 84px; }
+:root[data-theme="persona"] .du-screen-band {
+  position: absolute; left: -2rem; top: 14px; width: min(520px, 70%); height: 46px; z-index: 0;
+  background: var(--p5-red);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 40px) 100%, 0 100%);
+  transform: skewY(-2deg);
+}
+:root[data-theme="persona"] .du-screen-num {
+  font-family: var(--font-display); font-size: 64px; line-height: 0.9; color: var(--p5-yellow);
+  -webkit-text-stroke: 2px var(--p5-ink); text-shadow: 4px 4px 0 var(--p5-ink);
+  transform: rotate(-6deg) translateY(4px);
+}
+:root[data-theme="persona"] .du-screen-word { font-size: 56px; line-height: 0.95; color: var(--p5-white); letter-spacing: 0.01em; }
+:root[data-theme="persona"] .du-screen-word .du-cutout > span { -webkit-text-stroke: 2px var(--p5-ink); text-shadow: 4px 4px 0 var(--p5-ink); }
+:root[data-theme="persona"] .du-screen-sub { margin-top: 6px; font-size: 13px; color: var(--p5-grey); }
+:root[data-theme="persona"] .du-screen-title { animation: du-p5-slide 260ms var(--p5-ease) both; }
+
+/* Panel: satu panel besar per kelompok. Kartu di dalam kartu kehilangan bingkainya dan
+   menjadi bagian bergaris pemisah; panel terluar miring ringan, isinya tetap tegak. */
+:root[data-theme="persona"] .du-card .du-card {
+  border: 0 !important; clip-path: none; animation: none;
+  border-top: 2px solid #333 !important;
+  padding-left: 0 !important; padding-right: 0 !important;
+  background: transparent !important;
+}
+@media (min-width: 1024px) {
+  :root[data-theme="persona"] main > section > div > .du-card,
+  :root[data-theme="persona"] main > section > div > div > .du-card,
+  :root[data-theme="persona"] main > section > div > * > .du-card {
+    transform: skewX(-3deg);
+  }
+  :root[data-theme="persona"] main > section > div > .du-card > *,
+  :root[data-theme="persona"] main > section > div > div > .du-card > *,
+  :root[data-theme="persona"] main > section > div > * > .du-card > * {
+    transform: skewX(3deg);
+  }
+}
+
+/* Judul bagian di dalam panel: strip merah kecil di depan, gaya header daftar skill. */
+:root[data-theme="persona"] .du-card h3, :root[data-theme="persona"] .du-card h2 {
+  display: flex; align-items: center; gap: 0.5rem; font-size: 18px;
+}
+:root[data-theme="persona"] .du-card h3::before, :root[data-theme="persona"] .du-card h2::before {
+  content: ''; width: 10px; height: 18px; background: var(--p5-red); transform: skewX(var(--p5-skew)); flex: none;
+}
+
+/* Tabel & daftar: lajur LOAD -- baris bergantian abu/hitam, tepi kanan terpotong miring,
+   baris disorot putih. */
+:root[data-theme="persona"] table { border-collapse: separate; border-spacing: 0 4px; }
+:root[data-theme="persona"] thead th {
+  font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 400;
+  background: var(--p5-red); color: var(--p5-white) !important;
+}
+:root[data-theme="persona"] tbody tr { background: var(--p5-black-2); }
+:root[data-theme="persona"] tbody tr:nth-child(even) { background: #202020; }
+:root[data-theme="persona"] tbody tr > td:first-child { border-left: 4px solid var(--p5-white); font-family: var(--font-display); letter-spacing: 0.04em; }
+:root[data-theme="persona"] tbody tr > td:last-child { clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 100%, 0 100%); }
+:root[data-theme="persona"] tbody tr:hover { background: var(--p5-white); color: var(--p5-black); }
+:root[data-theme="persona"] tbody tr:hover td { color: var(--p5-black) !important; }
+
+/* Strip tab sekunder (pemilih mode Publish): tag hitam sobek berjajar, aktif putih. */
+:root[data-theme="persona"] .du-tabs { background: transparent !important; border: 0 !important; padding: 0 !important; gap: 6px; width: auto !important; max-width: 100%; flex-wrap: wrap; }
+:root[data-theme="persona"] .du-tab {
+  font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 400;
+  background: var(--p5-black) !important; color: var(--p5-white) !important;
+  border: 2px solid var(--p5-white) !important; box-shadow: none !important;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 6px));
+  transform: skewX(var(--p5-skew));
+}
+:root[data-theme="persona"] .du-tab > * { transform: skewX(calc(-1 * var(--p5-skew))); }
+:root[data-theme="persona"] .du-tab[data-active="true"] { background: var(--p5-white) !important; color: var(--p5-black) !important; }
+
+/* Banner hasil: pita merah diagonal, angka raksasa kuning, strip label. Sekali. */
+:root[data-theme="persona"] .du-result-band {
+  position: absolute; left: -10%; top: 30%; width: 120%; height: 120px;
+  background: var(--p5-red); transform: rotate(-8deg); transform-origin: left;
+  animation: du-p5-band 320ms var(--p5-ease) both, du-p5-fadeout 400ms ease 2200ms both;
+}
+:root[data-theme="persona"] .du-result-band-2 { top: 52%; height: 28px; background: var(--p5-white); animation-delay: 60ms, 2200ms; }
+:root[data-theme="persona"] .du-result-body { animation: du-p5-slide 320ms var(--p5-ease) 80ms both, du-p5-fadeout 400ms ease 2200ms both; }
+:root[data-theme="persona"] .du-result-title { font-size: 72px; line-height: 0.9; color: var(--p5-yellow); }
+:root[data-theme="persona"] .du-result-title .du-cutout > span { -webkit-text-stroke: 3px var(--p5-ink); text-shadow: 6px 6px 0 var(--p5-ink); }
+:root[data-theme="persona"] .du-result-number {
+  font-family: var(--font-display); font-size: 120px; line-height: 0.85; color: var(--p5-white);
+  -webkit-text-stroke: 3px var(--p5-ink); text-shadow: 6px 6px 0 var(--p5-red);
+  animation: du-p5-stampin 260ms var(--p5-ease) 200ms both;
+}
+:root[data-theme="persona"] .du-result-strip, :root[data-theme="persona"] .du-result-line {
+  display: inline-block; font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.08em;
+  background: var(--p5-black); color: var(--p5-white); padding: 2px 10px; transform: skewX(var(--p5-skew));
+  border: 2px solid var(--p5-white);
+}
+:root[data-theme="persona"] .du-result-line { display: block; width: max-content; margin-top: 8px; animation: du-p5-slide 240ms var(--p5-ease) calc(300ms + var(--i) * 70ms) both; }
+:root[data-theme="persona"] .du-result-sprite {
+  position: absolute; left: calc(20% + var(--i) * 6%); top: 40%; font-size: 28px; color: var(--p5-white);
+  animation: du-p5-sprite 900ms var(--p5-ease) calc(120ms + var(--i) * 40ms) both;
+}
+@keyframes du-p5-band { from { transform: rotate(-8deg) scaleX(0); } to { transform: rotate(-8deg) scaleX(1); } }
+@keyframes du-p5-fadeout { to { opacity: 0; } }
+@keyframes du-p5-stampin { from { opacity: 0; transform: scale(1.6) rotate(-4deg); } to { opacity: 1; transform: scale(1) rotate(-4deg); } }
+@keyframes du-p5-sprite { from { opacity: 1; transform: translate(0, 0) rotate(0); } to { opacity: 0; transform: translate(calc(-60px + var(--i) * 14px), -160px) rotate(220deg); } }
+@media (prefers-reduced-motion: reduce) {
+  :root[data-theme="persona"] .du-result-band, :root[data-theme="persona"] .du-result-body, :root[data-theme="persona"] .du-result-number,
+  :root[data-theme="persona"] .du-result-line, :root[data-theme="persona"] .du-result-sprite, :root[data-theme="persona"] .du-screen-title { animation: none !important; }
+  :root[data-theme="persona"] .du-result-sprite { display: none; }
+}
