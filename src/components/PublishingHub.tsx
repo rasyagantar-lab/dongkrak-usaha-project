@@ -27,6 +27,7 @@ import {
   Activity
 } from 'lucide-react';
 import { Campaign, DongkrakUsahaConnectionConfig } from '../types';
+import { buildListingData } from '../lib/listingData';
 
 interface PublishingHubProps {
   campaigns: Campaign[];
@@ -566,7 +567,10 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
     autopostRequestRef.current = requestId;
     setAutopostStatus('Mengirim data campaign ke form DongkrakUsaha...');
     setAutopostResult(null);
-    window.postMessage({ type: 'DONGKRAK_AUTOFILL_CAMPAIGN', requestId, campaign: activeCampaign }, '*');
+    // The extension reads campaign.dongkrakListingData; rebuild it from the current
+    // content so a run applied a minute ago is what lands in the form.
+    const fresh = { ...activeCampaign, dongkrakListingData: buildListingData(activeCampaign, activeCampaign.dongkrakListingData) };
+    window.postMessage({ type: 'DONGKRAK_AUTOFILL_CAMPAIGN', requestId, campaign: fresh }, '*');
     autopostTimeoutRef.current = setTimeout(() => {
       if (autopostRequestRef.current !== requestId) return;
       setAutopostResult({ success: false, error: 'AUTOFILL_TIMEOUT' });

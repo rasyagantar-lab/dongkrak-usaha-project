@@ -178,6 +178,9 @@ Every completed task in Phase 2 must update this file with what worked, what fai
 - The extension can now press DongkrakUsaha's own "Input Produk" button (list page -> entry form) on request; see PROJECT_KNOWLEDGE.md "One Click To DongkrakUsaha's Input Produk Form". Finder verified on synthetic DOM; real-site verification pending the operator's login. The landed URL, once observed, should be recorded as the proven form URL.
 
 
+## Listing Data Is Derived, Not Stored (2026-09-19)
+The Preview tab, "Terapkan ke Campaign", the Data Bisnis save and the autofill payload all go through `src/lib/listingData.ts` `buildListingData()`. The stored `dongkrakListingData` only preserves what the operator typed by hand (marketplace links, WhatsApp opener, strike-through price). If the Preview ever disagrees with the Konten node again, the answer is a caller that bypassed the builder.
+
 ## Verifying The Description Field Limit (2026-09-18)
 
 The DongkrakUsaha description field is a CKEditor rich-text box: it carries no `maxlength`, so the only proof of its limit is to save a long text and count what the page holds afterwards. Extension 1.2.0 adds the counter.

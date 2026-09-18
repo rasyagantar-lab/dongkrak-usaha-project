@@ -53,6 +53,13 @@ Status: PROVEN / FIXED
 Root Cause: service worker re-injected content.js after it was already alive.
 Fix: Added PING guard and safer recovery logic.
 
+### Bug 7 - Preview And Autofill Showed A Stale Description (2026-09-19)
+Status: FIXED / VERIFIED (tests + browser)
+Symptom: the Konten node reported the new article (owner's case: 1.917 karakter, 257 kata, six sections -- the instruction was in karakter, so the "1.900-an" was characters, not words), while the Preview tab and the extension autofill showed the description from before the run. Owner's guess was "the agent wrote into the meta field"; the meta field was fine (134/165).
+Root Cause: `campaign.dongkrakListingData` was a second copy of the content. The only code that ever wrote `deskripsi` from AI output was the legacy ContentGenerator, unmounted since content moved into the orchestrator; "Terapkan ke Campaign" updated `generatedContent` but never the listing, and the Preview preferred the stored listing. BusinessManager's save also wrote a mixed-key object (businessName, seoContent, …) that is not the listing shape, so a campaign saved there without a prior listing previewed an empty description.
+Fix: `src/lib/listingData.ts` `buildListingData(campaign, previous)` is the single mapping (tests in `tests/listingData.test.ts`): the Preview derives the listing from the current content, Terapkan and the Data Bisnis save store what the builder returns, and the autofill message carries a freshly built listing. Operator-typed fields (marketplace links, WhatsApp opener, strike-through price) are carried over from the previous listing. Meta limits live in `LISTING_LIMITS` (165 / 155).
+Verified: `npm test` 21/21; headless Preview shows the campaign's `generatedContent.seoDescription` (961 chars) instead of the stored 253-char listing.
+
 ### Bug 6 - App Bridge Dies When The Extension Is Reloaded (2026-09-18)
 Status: MECHANISM FIXED (harness-verified) / OWNER VERIFICATION ON THE REAL SITE PENDING
 Symptom: the popup reports the DongkrakUsaha tab, login and N fields, but the app's Publish tab stays at 0 fields ("Authoritative form container not yet locked") and "Isi Form Otomatis" is disabled (it requires formDetected).
@@ -725,6 +732,12 @@ Implementation (`server/firestoreTransport.ts` new; `server/storage.ts` refactor
 `public/dongkrakusaha-publisher-extension.zip` is tracked, and `generateExtensionZipBuffer` in `server.ts` rewrites it at every startup. JSZip stamps each entry -- the six files AND the directory entry -- with "now", so the file changed by ~42 bytes per start with identical contents and sat in source control as a phantom edit after every `npm run dev`. Fixed by pinning `date: EXTENSION_ZIP_DATE` (local-time 2026-01-01, so the DOS timestamp is timezone-independent) on the files and on an explicitly created directory entry (`zip.folder()` reuses an existing entry, so it must be created before the call). **Verified:** two restarts 61 s apart produce the same SHA-1; the zip still lists 7 entries with one shared date. From now on a dirty zip means the extension sources really changed.
 
 Also committed in the same batch: one self-improvement line the Strategy agent appended to `ai-agents/campaign-strategy.md` during the 2026-09-18 test run. Those runtime lines are the contract-growth mechanism (see `ai-agents/*.md` "Self-Improvement Rule"); they are committed as they appear, not reverted.
+
+## Owner Confirms Bug 6 Closed; "1.900 Kata" Was 1.917 Karakter; Listing Copy Retired (2026-09-19)
+
+Owner report after rest: (1) extension reports 1-2 resolved on the real site (Bug 6 fix confirmed by the owner). (2) "The content agent reports ~1.900 words but the Preview says otherwise." Screenshots showed the instruction had been read as `1.800–2.200 karakter (instruksi operator)`, the Konten node measured 257 kata · 16 kalimat · 1.917 karakter, and the pasted article had the six sub-headed sections in `seoDescription` with a separate 134-char meta -- the agent obeyed. The Preview showed an older text because the listing copy was never rebuilt: Bug 7 above. (3) Next: the owner wants to plan an "ultimate UI rework".
+
+Lesson recorded by the owner and accepted: Bug 6 was the cost of touching the extension without first reading the extension section of the map (rule 1). The rules exist to raise output, not to slow it; criticism of them is welcome, but skipping them is not.
 
 ## Owner Report After 1.2.0: Popup Sees 65 Fields, App Sees 0; First Field-Limit Evidence (2026-09-18, night)
 

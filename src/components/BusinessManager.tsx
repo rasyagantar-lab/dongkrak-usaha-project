@@ -1,3 +1,4 @@
+import { buildListingData } from '../lib/listingData';
 import React, { useState } from 'react';
 import { 
   Building2, 
@@ -102,39 +103,7 @@ export const BusinessManager: React.FC<BusinessManagerProps> = ({
       ...campaign,
       title: `Promosi ${formData.name}`,
       businessData: { ...formData },
-      dongkrakListingData: {
-        ...(campaign.dongkrakListingData || {
-          businessName: formData.name,
-          category: formData.category,
-          description: formData.description,
-          productsServices: formData.productsServices,
-          mainKeyword: formData.mainKeyword,
-          secondaryKeywords: formData.secondaryKeywords,
-          targetCities: formData.targetCities,
-          address: formData.address,
-          whatsAppPhone: formData.phoneWhatsApp,
-          website: formData.website,
-          socialMediaInstagram: formData.socialMedia?.instagram || '',
-          socialMediaFacebook: formData.socialMedia?.facebook || '',
-          price: formData.priceRange,
-          images: formData.images,
-          businessHours: formData.businessHours,
-          tags: formData.tags,
-          seoTitle: campaign.generatedContent?.seoTitle || formData.name,
-          metaDescription: campaign.generatedContent?.metaDescription || formData.description,
-          seoContent: campaign.generatedContent?.seoDescription || formData.description
-        }),
-        businessName: formData.name,
-        category: formData.category,
-        description: formData.description,
-        productsServices: formData.productsServices,
-        address: formData.address,
-        whatsAppPhone: formData.phoneWhatsApp,
-        website: formData.website,
-        price: formData.priceRange,
-        images: formData.images,
-        businessHours: formData.businessHours
-      },
+      dongkrakListingData: buildListingData({ ...campaign, businessData: { ...formData } }, campaign.dongkrakListingData),
       updatedAt: new Date().toISOString()
     };
 

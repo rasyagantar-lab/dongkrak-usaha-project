@@ -132,3 +132,7 @@ Do not invent unavailable models, hidden tools, or unsupported APIs. Use only do
 - [2026-09-17] Penggunaan placeholder lokasi pada data input bisnis harus diidentifikasi sebagai batas awal untuk memicu penyesuaian manual oleh pengguna.
 - [2026-09-18] Penyebutan merek furniture populer secara spesifik bersama lokasi target Andir efektif memperkuat relevansi pencarian niat lokal pada artikel panjang.
 - [2026-09-18] Memastikan instruksi panjang kata 550 kata dan fokus garansi diteruskan secara mendalam ke Content Generation Agent agar tidak membutuhkan revisi tambahan pada tahap audit.
+- [2026-09-18] Penyebutan spesifik merek furniture knockdown populer (IKEA, Informa, Dekoruma) bersama area Arcamanik terbukti efektif meningkatkan relevansi pencarian niat lokal.
+- [2026-09-18] Penyebutan spesifik merek furniture knockdown populer seperti IKEA, Informa, dan Olympic bersama area Astana Anyar secara konsisten memperkuat relevansi pencarian niat lokal.
+- [2026-09-18] Mengintegrasikan merek furniture knockdown ternama dengan kebutuhan bongkar-pasang pindahan kantor dan rumah di Babakan Ciparay efektif memperluas cakupan kata kunci niat lokal.
+- [2026-09-18] Menyebutkan merek furniture knockdown populer secara spesifik bersama area Arcamanik terbukti efektif meningkatkan relevansi pencarian niat lokal pada artikel SEO.

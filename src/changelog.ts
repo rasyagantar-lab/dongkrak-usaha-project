@@ -27,6 +27,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Kotak Konten di kanvas menampilkan tiga ukuran sekaligus (kata · kalimat · karakter) dan aturan yang dipakai run itu.',
       'Extension: tombol "Ukur Field Halaman Ini" menghitung isi kolom deskripsi DongkrakUsaha dan daftar batas maxlength — hasilnya muncul di tab Publish. Ini alat untuk memastikan batas field yang sebenarnya.',
       'Badge versi di header sekarang selalu benar.',
+      'Preview dan autofill sekarang selalu memakai konten yang baru diterapkan — sebelumnya bisa menampilkan deskripsi lama walau kotak Konten sudah berisi artikel baru.',
       'Setelah extension di-reload, tab Publish tidak lagi "buta" (0 field padahal popup melihat semuanya): status dikirim ulang otomatis, dan kalau gagal ada petunjuk jelas apa yang harus ditekan.'
     ]
   },

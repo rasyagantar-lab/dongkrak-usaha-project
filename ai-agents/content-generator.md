@@ -86,3 +86,7 @@ This file is your live rulebook: the application reads it fresh and shows it to 
 - [2026-09-18] Memperluas paragraf secara natural dengan memperdalam rincian layanan dan proses kerja terstruktur efektif mencapai target rentang kata tanpa menambah fakta palsu.
 - [2026-09-18] Memperluas rincian setiap bagian secara proporsional dan natural berhasil memenuhi target rentang kata yang disyaratkan oleh operator tanpa menambahkan informasi palsu.
 - [2026-09-18] Memperluas paragraf secara konsisten di setiap bagian sesuai struktur enam bagian terbukti efektif mencapai rentang 950-1000 kata tanpa menyimpang dari fakta asli.
+- [2026-09-18] Membagi deskripsi SEO ke dalam enam bagian terstruktur dengan alur yang runtut terbukti efektif mempertahankan batas kata minimal 500-1000 kata tanpa menambah fakta yang tidak valid.
+- [2026-09-18] Menjaga konsistensi panjang paragraf dalam enam bagian terstruktur terbukti sangat efektif untuk mencapai target rentang kata 500-1000 kata tanpa menyimpang dari aturan tanpa markdown.
+- [2026-09-18] Memperluas paragraf secara natural pada setiap bagian terstruktur terbukti efektif memenuhi batas minimum kata tanpa mengorbankan kualitas atau menambahkan informasi palsu.
+- [2026-09-18] Menjaga struktur enam bagian dengan alur yang konsisten terbukti efektif memenuhi rentang kata yang disyaratkan tanpa menyimpang dari fakta asli bisnis.

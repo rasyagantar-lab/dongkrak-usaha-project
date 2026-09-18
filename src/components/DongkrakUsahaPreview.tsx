@@ -1,3 +1,4 @@
+import { buildListingData } from '../lib/listingData';
 import React from 'react';
 import { Send, CheckCircle2 } from 'lucide-react';
 import { Campaign, DongkrakUsahaListingData } from '../types';
@@ -12,22 +13,9 @@ export const DongkrakUsahaPreview: React.FC<DongkrakUsahaPreviewProps> = ({
   campaign,
   onNavigatePublishing
 }) => {
-  const listing: DongkrakUsahaListingData = campaign.dongkrakListingData || {
-    namaProduk: campaign.generatedContent?.seoTitle || campaign.businessData.name,
-    kategori: campaign.businessData.category,
-    deskripsi: campaign.generatedContent?.seoDescription || campaign.businessData.description,
-    noWhatsApp: campaign.businessData.phoneWhatsApp.replace(/\D/g, ''),
-    harga: campaign.businessData.priceRange.replace(/\D/g, '') || '0',
-    images: campaign.businessData.images,
-    penawaran: campaign.generatedContent?.shortSnippet || '',
-    hargaSebelumDiskon: '0',
-    metaKeyword: [...(campaign.generatedContent?.tags || []), campaign.seoStrategy.mainKeyword, ...(campaign.seoStrategy.secondaryKeywords || [])].join(', ').substring(0, 155),
-    metaDeskripsi: (campaign.generatedContent?.metaDescription || campaign.businessData.description).substring(0, 165),
-    textWhatsApp: `Halo, saya ingin bertanya tentang ${campaign.businessData.name}`,
-    linkBukalapak: '',
-    linkTokopedia: '',
-    linkShopee: ''
-  };
+  // Always derived from the campaign's current content: a stored listing is only
+  // consulted for the fields the operator typed by hand (links, WhatsApp opener).
+  const listing: DongkrakUsahaListingData = buildListingData(campaign, campaign.dongkrakListingData);
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">

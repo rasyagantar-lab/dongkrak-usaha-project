@@ -6,6 +6,7 @@ import { AgentCanvas } from './orchestrator/AgentCanvas';
 import { NodeInspector, type HumanFinding } from './orchestrator/NodeInspector';
 import { deriveGraphState, type LedgerEntry } from './orchestrator/canvasGraph';
 import { parseLengthRule, describe as describeRule, type LengthRule, type Measured } from '../lib/lengthRule';
+import { buildListingData } from '../lib/listingData';
 
 /*
   The orchestrator tab is a canvas of the pipeline, not a stack of report blocks.
@@ -116,7 +117,7 @@ export const OrchestratorPanel: React.FC<OrchestratorPanelProps> = ({ campaign, 
   const handleApply = () => {
     if (!run) return;
     const { seoStrategy, generatedContent, audit, imageBrief } = run.outputs;
-    onUpdateCampaign({
+    const next: Campaign = {
       ...campaign,
       seoStrategy: seoStrategy || campaign.seoStrategy,
       generatedContent: generatedContent || campaign.generatedContent,
@@ -124,7 +125,10 @@ export const OrchestratorPanel: React.FC<OrchestratorPanelProps> = ({ campaign, 
       imageBrief: imageBrief || campaign.imageBrief,
       status: audit?.publishingReadiness === 'READY' ? 'Ready to Publish' : campaign.status,
       updatedAt: new Date().toISOString()
-    });
+    };
+    // The listing (Preview, autofill) is rebuilt from the content just applied;
+    // otherwise both kept showing the description from before this run.
+    onUpdateCampaign({ ...next, dongkrakListingData: buildListingData(next, campaign.dongkrakListingData) });
     setApplied(true);
   };
 
