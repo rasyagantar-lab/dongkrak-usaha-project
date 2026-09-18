@@ -187,7 +187,11 @@ export const AgentCanvas: React.FC<AgentCanvasProps> = ({
       return;
     }
     if (!drag.current || drag.current.id !== e.pointerId) return;
-    setView(v => ({ ...v, x: e.clientX - drag.current!.x, y: e.clientY - drag.current!.y }));
+    // Read the ref NOW. A functional updater runs at render time, and while a run is
+    // in flight (polling every 1.2 s) that render is often deferred -- long enough for
+    // pointerup to null the ref first. Reading it inside the updater crashed the tab.
+    const x = e.clientX - drag.current.x, y = e.clientY - drag.current.y;
+    setView(v => ({ ...v, x, y }));
   };
 
   const endPointer = (e: React.PointerEvent) => {

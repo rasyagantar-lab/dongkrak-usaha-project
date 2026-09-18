@@ -24,6 +24,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     items: [
       'Tombol layar penuh di kanvas orchestrator sekarang benar-benar memenuhi layar (sebelumnya cuma garis hitam tipis).',
       'Di HP, kotak agent pertama tidak lagi tertutup panel campaign saat kanvas dibuka.',
+      'Layar putih saat orchestrator jalan sudah ketemu penyebabnya (geser kanvas lalu lepas cepat) dan diperbaiki.',
       'Kalau ada bagian aplikasi yang error, yang muncul sekarang panel merah dengan tombol "Coba lagi" dan "Salin detail error" — bukan halaman putih yang harus di-refresh. Kirim hasil salinannya kalau ini terjadi.'
     ]
   },
