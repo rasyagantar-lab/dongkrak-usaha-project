@@ -489,6 +489,30 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request.action === 'MEASURE_DONGKRAK_FIELDS') {
+    // Popup -> the DongkrakUsaha tab (active one first) -> popup, and a copy to every
+    // app tab so the Publish tab can compare "sent" with "saved".
+    chrome.tabs.query({}, (tabs) => {
+      const all = tabs || [];
+      const dongkrak = all.filter(t => (((t.url || '') + (t.pendingUrl || '')).toLowerCase()).includes('dongkrakusaha.com'));
+      const target = dongkrak.find(t => t.active) || dongkrak[0];
+      if (!target) { sendResponse({ ok: false, error: 'NO_DONGKRAK_TAB' }); return; }
+      chrome.tabs.sendMessage(target.id, { action: 'MEASURE_FIELDS' }, { frameId: 0 }, (res) => {
+        const err = chrome.runtime.lastError;
+        const payload = (err || !res) ? { ok: false, error: err ? err.message : 'NO_RESPONSE', url: target.url } : res;
+        payload.tabUrl = target.url || '';
+        try { sendResponse(payload); } catch (e) {}
+        all.forEach(t => {
+          const u = t.url || '';
+          if (u.includes('run.app') || u.includes('localhost') || u.includes('127.0.0.1') || u.includes('ai.studio')) {
+            chrome.tabs.sendMessage(t.id, { action: 'FIELD_MEASURE', payload }).catch(() => {});
+          }
+        });
+      });
+    });
+    return true;
+  }
+
   if (request.action === 'OPEN_DONGKRAK_LOGIN') {
     chrome.tabs.create({ url: "https://dongkrakusaha.com/panelMember/" }, (tab) => {
       sendResponse({ success: true, tabId: tab.id });

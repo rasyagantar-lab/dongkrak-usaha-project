@@ -101,7 +101,61 @@ export interface DiagnosticLog {
   details?: string;
 }
 
-export interface ExtensionInspectionState {
+export interface FieldMeasure {
+  ok: boolean;
+  editor?: string;
+  fieldName?: string;
+  karakter?: number;
+  kata?: number;
+  kalimat?: number;
+  maxlengthInputs?: Array<{ label: string; name: string; maxlength: number; tag: string }>;
+  url?: string;
+  tabUrl?: string;
+  measuredAt?: string;
+  error?: string;
+}
+
+// Rendered under the extension status: the numbers the field-limit decision needs.
+// "Dikirim" is the active campaign's description as the extension would fill it;
+// "tersimpan" is what the page holds now, so after a publish the two compare directly.
+const FieldMeasurePanel: React.FC<{ measure: FieldMeasure | null; sentText?: string }> = ({ measure, sentText }) => {
+  if (!measure) return null;
+  const fmt = (n?: number) => Number(n || 0).toLocaleString('id-ID');
+  const sent = String(sentText || '').trim().length;
+  const saved = measure.karakter || 0;
+  const verdict = !measure.ok || !sent ? null
+    : saved >= sent * 0.97 ? 'utuh — tidak terpotong pada ukuran ini'
+    : 'terpotong: tersimpan ' + fmt(saved) + ' dari ' + fmt(sent) + ' karakter';
+  const inputs = measure.maxlengthInputs || [];
+  return (
+    <div className="p-3 bg-slate-900 rounded border border-slate-800 space-y-1.5 text-xs">
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-bold text-slate-200">Batas field terdeteksi</span>
+        <span className="text-3xs text-slate-500">{measure.measuredAt ? new Date(measure.measuredAt).toLocaleTimeString('id-ID') : ''}</span>
+      </div>
+      {measure.ok ? (
+        <div className="text-slate-300">
+          Deskripsi di halaman: <span className="font-bold text-emerald-300">{fmt(measure.karakter)} karakter</span> · {fmt(measure.kata)} kata · {fmt(measure.kalimat)} kalimat
+          <span className="text-slate-500"> (editor: {measure.editor}{measure.fieldName ? ', ' + measure.fieldName : ''})</span>
+        </div>
+      ) : (
+        <div className="text-amber-300">Editor deskripsi tidak ditemukan di halaman itu{measure.error ? ' (' + measure.error + ')' : ''}. Buka form Input Produk atau halaman edit produk, lalu ukur lagi.</div>
+      )}
+      {verdict && (
+        <div className={saved >= sent * 0.97 ? 'text-emerald-300' : 'text-amber-300'}>
+          Dikirim dari campaign aktif: {fmt(sent)} karakter → {verdict}
+        </div>
+      )}
+      <div className="text-slate-400">
+        {inputs.length > 0
+          ? <>maxlength: {inputs.map((i, idx) => <span key={idx}>{idx > 0 ? ' · ' : ''}<span className="text-slate-200">{i.label || i.name}</span> = {i.maxlength}</span>)}</>
+          : 'Tidak ada input dengan maxlength di halaman itu — batas deskripsi hanya bisa dibuktikan dengan simpan lalu ukur ulang.'}
+      </div>
+    </div>
+  );
+};
+
+interface ExtensionInspectionState {
   extensionDetected: boolean;
   tabDetected: boolean;
   isLoggedIn: boolean;
@@ -144,6 +198,10 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
   const isRecoveringRef = useRef<boolean>(false);
 
   const [publisherMode, setPublisherMode] = useState<'EXTENSION' | 'MANUAL' | 'EXPORT'>('EXTENSION');
+  // "Ukur field" result from the extension popup: what the DongkrakUsaha page holds
+  // in its description editor, and every input that declares a maxlength. This is
+  // the evidence for the description-length decision (PROJECT_KNOWLEDGE 2026-09-18).
+  const [fieldMeasure, setFieldMeasure] = useState<FieldMeasure | null>(null);
   const [extState, setExtState] = useState<ExtensionInspectionState>({
     extensionDetected: false,
     tabDetected: false,
@@ -717,6 +775,11 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
         }));
 
         requestExtensionState('bridge-init-' + Date.now());
+      }
+
+      if (event.data.type === 'DONGKRAK_FIELD_MEASURE') {
+        setFieldMeasure(event.data.payload || null);
+        return;
       }
 
       if (event.data.type === 'DONGKRAK_EXTENSION_HANDSHAKE_RESPONSE' || event.data.type === 'DONGKRAK_REAL_EXT_INSPECT_RES') {
@@ -1599,6 +1662,8 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
                 <span className="text-3xs text-slate-500 block">Authoritative fields</span>
               </div>
             </div>
+
+            <FieldMeasurePanel measure={fieldMeasure} sentText={activeCampaign.generatedContent?.seoDescription} />
 
             {/* Provenance Table */}
             {extState.fieldsDiscovered.length > 0 && (

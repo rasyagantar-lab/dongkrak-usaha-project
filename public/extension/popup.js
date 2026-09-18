@@ -4,6 +4,37 @@ document.addEventListener('DOMContentLoaded', () => {
   const formStatusEl = document.getElementById('formStatus');
   const fieldsCountEl = document.getElementById('fieldsCount');
   const btnCheck = document.getElementById('btnCheck');
+  const btnMeasure = document.getElementById('btnMeasure');
+  const measureResultEl = document.getElementById('measureResult');
+
+  // Field-limit verification helper: what the DongkrakUsaha page currently holds in
+  // its description editor, plus every input that declares a maxlength.
+  const fmtId = (n) => Number(n || 0).toLocaleString('id-ID');
+  function measureFields() {
+    if (!measureResultEl) return;
+    measureResultEl.style.display = 'block';
+    measureResultEl.textContent = 'Mengukur...';
+    if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) {
+      measureResultEl.textContent = 'Context Missing';
+      return;
+    }
+    chrome.runtime.sendMessage({ action: 'MEASURE_DONGKRAK_FIELDS' }, (res) => {
+      const r = res || {};
+      if (!r.ok) {
+        measureResultEl.textContent = r.error === 'NO_DONGKRAK_TAB'
+          ? 'Buka tab DongkrakUsaha dulu (form Input Produk atau halaman edit produk).'
+          : 'Editor deskripsi tidak ditemukan di halaman itu' + (r.error ? ' (' + r.error + ')' : '') + '. Daftar maxlength: ' + ((r.maxlengthInputs || []).map((i) => (i.label || i.name) + ' = ' + i.maxlength).join(', ') || 'tidak ada');
+        return;
+      }
+      const lines = [
+        'Deskripsi di halaman: ' + fmtId(r.karakter) + ' karakter · ' + fmtId(r.kata) + ' kata · ' + fmtId(r.kalimat) + ' kalimat (' + r.editor + ')',
+        'maxlength: ' + ((r.maxlengthInputs || []).map((i) => (i.label || i.name) + ' = ' + i.maxlength).join(' · ') || 'tidak ada input ber-maxlength di halaman ini'),
+        'Hasil juga dikirim ke tab Publish aplikasi.'
+      ];
+      measureResultEl.textContent = lines.join('\n');
+      measureResultEl.style.whiteSpace = 'pre-line';
+    });
+  }
 
   function checkStatus() {
     tabStatusEl.textContent = 'Memeriksa...';
@@ -55,6 +86,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
       fieldsCountEl.textContent = `${fieldsCount} Field Terdeteksi`;
     });
+  }
+
+  if (btnMeasure) {
+    btnMeasure.addEventListener('click', measureFields);
   }
 
   if (btnCheck) {

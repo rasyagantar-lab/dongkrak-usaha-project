@@ -14,9 +14,21 @@ export interface ChangelogEntry {
   items: string[];
 }
 
-export const APP_VERSION = '2.7';
+export const APP_VERSION = '2.8';
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '2.8',
+    date: '2026-09-18',
+    title: 'Kolom instruksi benar-benar berkuasa',
+    items: [
+      'Apa yang kamu tulis di "Tujuan & instruksi" sekarang jadi prioritas tertinggi untuk penulis konten dan auditor — termasuk panjang dalam kata, kalimat, atau karakter (mis. "40–60 kalimat", "maksimal 2.000 karakter").',
+      'Di bawah kolom itu ada baris "Terbaca:" yang memberi tahu cara sistem menafsirkan instruksimu sebelum run dimulai, termasuk kalau permintaan dipotong plafon teknis dan kenapa.',
+      'Kotak Konten di kanvas menampilkan tiga ukuran sekaligus (kata · kalimat · karakter) dan aturan yang dipakai run itu.',
+      'Extension: tombol "Ukur Field Halaman Ini" menghitung isi kolom deskripsi DongkrakUsaha dan daftar batas maxlength — hasilnya muncul di tab Publish. Ini alat untuk memastikan batas field yang sebenarnya.',
+      'Badge versi di header sekarang selalu benar.'
+    ]
+  },
   {
     version: '2.7',
     date: '2026-09-18',

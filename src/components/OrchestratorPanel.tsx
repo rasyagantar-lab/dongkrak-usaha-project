@@ -5,6 +5,7 @@ import { useJobCenter, useJob, pollOrchestratorProgress } from '../jobs';
 import { AgentCanvas } from './orchestrator/AgentCanvas';
 import { NodeInspector, type HumanFinding } from './orchestrator/NodeInspector';
 import { deriveGraphState, type LedgerEntry } from './orchestrator/canvasGraph';
+import { parseLengthRule, describe as describeRule, type LengthRule, type Measured } from '../lib/lengthRule';
 
 /*
   The orchestrator tab is a canvas of the pipeline, not a stack of report blocks.
@@ -38,6 +39,9 @@ interface OrchestratorRun {
   revisionHistory?: Array<{ round: number; scoreBefore: number; scoreAfter: number; readinessBefore: string; readinessAfter: string; accepted: boolean }>;
   summary: { total: number; done: number; failed: number; skipped: number; fallbacksUsed: number; revisions?: number; revisionsAccepted?: number };
   durationMs: number;
+  /** The length rule the server actually applied (parsed from the instruction field). */
+  rules?: { length: LengthRule };
+  measured?: Measured;
 }
 
 interface OrchestratorPanelProps {
@@ -176,6 +180,9 @@ export const OrchestratorPanel: React.FC<OrchestratorPanelProps> = ({ campaign, 
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // The same parser the server runs, so what this line promises is what the run
+  // enforces. It answers "did it understand me?" before a single call is spent.
+  const readRule = useMemo(() => parseLengthRule(objective), [objective]);
   const toolbar = (
     <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-2.5 sm:p-3 space-y-2.5 max-w-3xl">
       <div className="flex flex-col sm:flex-row sm:items-center gap-2">
@@ -200,6 +207,15 @@ export const OrchestratorPanel: React.FC<OrchestratorPanelProps> = ({ campaign, 
           {isRunning ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
           {isRunning ? 'Berjalan...' : 'Jalankan'}
         </button>
+      </div>
+
+      <div className={`text-2xs leading-snug ${readRule.clamped ? 'text-amber-300' : readRule.source === 'operator' ? 'text-sky-300' : 'text-slate-500'}`}>
+        <span className="font-bold">Terbaca:</span>{' '}
+        {readRule.clamped
+          ? readRule.clamped
+          : readRule.source === 'operator'
+            ? `panjang ${describeRule(readRule)} — diukur server, dikoreksi otomatis kalau meleset.`
+            : `tidak ada instruksi panjang; dipakai default pembimbing ${describeRule(readRule).replace(' (default pembimbing)', '')}. Tulis mis. "40–60 kalimat" atau "maksimal 2.000 karakter" untuk mengubahnya.`}
       </div>
 
       {(run || isRunning || error) && (
@@ -267,6 +283,7 @@ export const OrchestratorPanel: React.FC<OrchestratorPanelProps> = ({ campaign, 
               nodeId={selectedNode}
               graph={graph}
               outputs={run?.outputs || {}}
+              lengthRule={run?.rules?.length || readRule}
               blockers={run?.blockers || []}
               revisionHistory={run?.revisionHistory || []}
               humanFindings={humanFindings}

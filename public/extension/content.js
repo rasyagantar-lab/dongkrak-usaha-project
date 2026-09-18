@@ -368,7 +368,68 @@ function clickInputProdukButton() {
 }
 
 if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
+
+// ---- Field measurement (2026-09-18) ----
+// The DongkrakUsaha description field is a CKEditor: it has no maxlength attribute, so
+// the only way to learn its real limit is to save a long text, reopen the page and
+// count what survived. This reads whatever the page currently holds (the editor's
+// WYSIWYG iframe, or a plain textarea) and lists every input that DOES declare a
+// maxlength, so the "200 karakter" claim about the short description can be checked
+// on the spot. Runs from the popup ("Ukur field halaman ini") and reports to the app.
+const countText = (text) => {
+  const rawText = String(text || '').replace(/[ \t]+\n/g, '\n').trim();
+  if (!rawText) return { kata: 0, kalimat: 0, karakter: 0 };
+  const kata = rawText.split(/\s+/).filter(Boolean).length;
+  const kalimat = rawText
+    .replace(/\b(rp|dll|dsb|dst|no|jl|tel|telp|hp|wa|dr|bpk|ibu|sdr|tgl|thn)\./gi, (m) => m.replace('.', ''))
+    .split(/[.!?]+(?=\s|$)|\n+/)
+    .map((s) => s.trim())
+    .filter((s) => s.split(/\s+/).filter(Boolean).length >= 2).length;
+  return { kata, kalimat, karakter: rawText.length };
+};
+
+const labelForField = (el) => {
+  const byFor = el.id ? document.querySelector('label[for="' + CSS.escape(el.id) + '"]') : null;
+  const group = el.closest('.form-group, .mb-3, .row, td, li, div');
+  const text = (byFor && byFor.innerText) || (group && group.querySelector('label') && group.querySelector('label').innerText) || '';
+  return String(text || el.getAttribute('placeholder') || el.name || el.id || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+};
+
+const measureDescriptionField = () => {
+  let text = '';
+  let editor = 'none';
+  let fieldName = '';
+  const frames = Array.from(document.querySelectorAll('iframe.cke_wysiwyg_frame, iframe[title*="Rich Text Editor"], iframe[src="javascript:false"]'));
+  for (const frame of frames) {
+    let body = null;
+    try { body = frame.contentDocument && frame.contentDocument.body; } catch (e) { body = null; }
+    if (body && body.innerText && body.innerText.trim()) {
+      text = body.innerText;
+      editor = 'ckeditor-iframe';
+      const holder = frame.closest('.cke, .form-group, .row, div');
+      const ta = holder ? holder.querySelector('textarea') : null;
+      fieldName = (ta && (ta.name || ta.id)) || frame.title || '';
+      break;
+    }
+  }
+  if (editor === 'none') {
+    const ta = Array.from(document.querySelectorAll('textarea')).find((el) => /deskripsi|description/i.test((el.name || '') + ' ' + (el.id || '') + ' ' + labelForField(el)));
+    if (ta) { text = ta.value; editor = 'textarea'; fieldName = ta.name || ta.id || ''; }
+  }
+  const maxlengthInputs = Array.from(document.querySelectorAll('input[maxlength], textarea[maxlength]'))
+    .map((el) => ({ label: labelForField(el), name: el.name || el.id || '', maxlength: Number(el.getAttribute('maxlength')) || 0, tag: el.tagName.toLowerCase() }))
+    .filter((x) => x.maxlength > 0);
+  return Object.assign({ ok: editor !== 'none', editor, fieldName, url: location.href, measuredAt: new Date().toISOString(), maxlengthInputs }, countText(text));
+};
+
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === 'MEASURE_FIELDS') {
+      // Synchronous: reads the DOM that is already there.
+      let result;
+      try { result = measureDescriptionField(); } catch (e) { result = { ok: false, error: e && e.message ? e.message : 'MEASURE_FAILED', url: location.href }; }
+      sendResponse(result);
+      return false;
+    }
     if (request.action === 'PING') {
       // Lightweight liveness check so background.js can tell whether a content
       // script is already alive in this tab BEFORE deciding to re-inject content.js.
@@ -454,6 +515,10 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
         submitControl.click();
       }
       sendResponse({ success: true, submitted: false, dispatched: true, mode: 'SUBMITTED', submitMethod, formSelector: form.selector, message: 'Submit event dispatched. Publish is not confirmed until a success URL or page confirmation is detected.' });
+    } else if (request.action === 'FIELD_MEASURE') {
+      // App-page bridge: the measurement taken on the DongkrakUsaha tab, for the
+      // Publish tab's "Batas field terdeteksi" panel.
+      window.postMessage({ type: 'DONGKRAK_FIELD_MEASURE', payload: request.payload || {} }, '*');
     } else if (request.action === 'STATE_UPDATED') {
       const payload = request.payload || request.state || {};
       const dongkrakState = payload.dongkrakState || payload;

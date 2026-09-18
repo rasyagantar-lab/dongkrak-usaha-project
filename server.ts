@@ -10,6 +10,7 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import { InferenceClient } from "@huggingface/inference";
 import * as opentypeNs from "opentype.js";
+import { parseLengthRule, measure, inRange, describe as describeRule, type LengthRule } from "./src/lib/lengthRule";
 // opentype.js is a CommonJS module. tsx (ESM dev mode) surfaces its exports under
 // .default while the esbuild CJS bundle surfaces them at the top level; resolve once.
 const opentype: typeof opentypeNs = ((opentypeNs as any).parse ? opentypeNs : (opentypeNs as any).default) as typeof opentypeNs;
@@ -1457,21 +1458,40 @@ const CONTENT_SCHEMA = {
 // `revision` carries the previous draft plus the audit's objections. When present the
 // agent is rewriting rather than writing fresh, which is what lets the orchestrator
 // close the loop instead of shipping content the auditor already rejected.
-// The supervisor's publishing rule (2026-09-18): the listing description is an SEO
-// article of 500-1000 words. The model is told the target and the SERVER measures the
-// result -- models estimate their own word counts badly, so the number is never left
-// to them. One corrective pass is allowed before the audit sees the draft; after that
-// the audit's own (server-measured) length finding drives the normal revision loop.
-const CONTENT_WORDS = { min: 500, max: 1000, target: 650 };
-const countWords = (text: unknown) => String(text ?? "").trim().split(/\s+/).filter(Boolean).length;
-const wordsInRange = (n: number) => n >= CONTENT_WORDS.min && n <= CONTENT_WORDS.max;
+// Length is a rule, not a constant: the operator's instruction (parsed by
+// src/lib/lengthRule.ts, the same module the UI uses) or the supervisor's default.
+// The model is told the target and the SERVER measures the result in the rule's own
+// unit -- models estimate their own counts badly. One corrective pass is allowed
+// before the audit sees the draft; after that the audit's server-measured Length
+// finding drives the normal revision loop.
+type Brief = { objective?: string; taskBreakdown?: string[] } | undefined;
+const briefBlock = (brief: Brief) => brief && (brief.objective || brief.taskBreakdown?.length)
+  ? `Briefing dari Orchestrator (tafsiran tujuan operator):
+- Tujuan: ${brief.objective || '-'}
+${(brief.taskBreakdown || []).slice(0, 6).map(t => `- ${t}`).join('\n')}
+`
+  : '';
+// The operator's words sit at the top of every writing/judging prompt, with their
+// precedence spelled out: the field is an instruction, not a hint.
+const operatorBlock = (objective: string | undefined, rule: LengthRule, brief: Brief) => `
+=== INSTRUKSI OPERATOR (PRIORITAS TERTINGGI) ===
+${objective?.trim() || '(tidak ada instruksi khusus; berlaku aturan bawaan)'}
+Aturan panjang yang berlaku: ${describeRule(rule)}${rule.clamped ? ` — ${rule.clamped}` : ''}.
+Instruksi ini mengalahkan prinsip bawaan tentang panjang, struktur, nada, dan penekanan.
+Yang TIDAK bisa dikalahkan: larangan mengarang fakta dan format teks polos tanpa markdown.
+${briefBlock(brief)}=== AKHIR INSTRUKSI OPERATOR ===
+`;
+const perSection = (rule: LengthRule) => ({ lo: Math.round(rule.target / 6), hi: Math.round((rule.target / 6) * 1.25) });
 
 async function runContentAgent(
   businessData: any,
   seoStrategy: any,
   revision?: { previousContent: any; audit: any },
-  objective?: string
+  objective?: string,
+  rule: LengthRule = parseLengthRule(objective),
+  brief?: Brief
 ): Promise<{ result: any; meta: AgentMeta }> {
+  const section = perSection(rule);
   const revisionBlock = revision
     ? `
 
@@ -1481,7 +1501,7 @@ Draft sebelumnya sudah dinilai oleh Quality Audit Agent dan DITOLAK/diberi catat
 Draft sebelumnya:
 - SEO Title: ${revision.previousContent?.seoTitle || ''}
 - Meta Description: ${revision.previousContent?.metaDescription || ''}
-- Deskripsi (${countWords(revision.previousContent?.seoDescription)} kata): ${String(revision.previousContent?.seoDescription || '').slice(0, 9000)}
+- Deskripsi (${measure(revision.previousContent?.seoDescription)[rule.unit]} ${rule.unit}): ${String(revision.previousContent?.seoDescription || '').slice(0, 9000)}
 
 Hasil audit (status ${revision.audit?.publishingReadiness || 'WARNINGS'}, skor SEO ${revision.audit?.seoScore ?? '-'}, kualitas ${revision.audit?.contentQuality ?? '-'}, relevansi lokal ${revision.audit?.localRelevance ?? '-'}):
 ${(revision.audit?.findings || [])
@@ -1493,12 +1513,12 @@ INSTRUKSI REVISI:
 - Perbaiki setiap temuan di atas yang bisa diperbaiki lewat penulisan ulang.
 - Temuan soal data yang memang TIDAK ADA (misal nomor WhatsApp atau alamat tidak diisi user) TIDAK BOLEH diperbaiki dengan mengarang data. Biarkan, jangan diisi dengan tebakan.
 - Pertahankan bagian yang sudah baik; jangan menulis ulang total tanpa alasan.
-- Hasil revisi TETAP artikel utuh ${CONTENT_WORDS.min}-${CONTENT_WORDS.max} kata dengan enam bagian yang sama; jangan memendekkan
+- Hasil revisi TETAP artikel utuh ${rule.min}-${rule.max} ${rule.unit} dengan enam bagian yang sama; jangan memendekkan
   atau meringkas draft -- perbaiki temuan di dalam artikel yang ada.`
     : '';
 
   const prompt = `Anda adalah pakar Copywriting Local SEO Indonesia untuk listing bisnis di DongkrakUsaha (dongkrakusaha.com).
-
+${operatorBlock(objective, rule, brief)}
 Data Bisnis:
 - Nama: ${businessData.name}
 - Kategori: ${businessData.category}
@@ -1513,46 +1533,47 @@ Strategi SEO:
 - Secondary Keywords: ${seoStrategy?.secondaryKeywords?.join(', ') || ''}
 - Content Angle: ${seoStrategy?.contentAngle || ''}
 
-Instruksi operator (dari kolom Tujuan Campaign): ${objective || '-'}
-
 PRINSIP WAJIB:
 1. Relevan dengan lokasi target tanpa melakukan keyword stuffing.
 2. Gaya bahasa natural, profesional, persuasif.
 3. JANGAN mengarang fakta bisnis, harga, sertifikasi, alamat, atau nomor kontak yang tidak diberikan user.
 4. Buat SEO Title yang menarik (maks 65 karakter).
 5. Buat Meta Description yang persuasif (120-160 karakter).
-6. seoDescription adalah ARTIKEL SEO ${CONTENT_WORDS.min}-${CONTENT_WORDS.max} KATA (sasaran sekitar ${CONTENT_WORDS.target} kata).
-   Kurang dari ${CONTENT_WORDS.min} kata ditolak, lebih dari ${CONTENT_WORDS.max} kata ditolak. Teks polos: paragraf pendek,
+6. seoDescription adalah ARTIKEL SEO ${rule.min}-${rule.max} ${rule.unit.toUpperCase()} (sasaran sekitar ${rule.target} ${rule.unit}).
+   Kurang dari ${rule.min} ${rule.unit} ditolak, lebih dari ${rule.max} ${rule.unit} ditolak. Teks polos: paragraf pendek,
    sub-judul singkat di barisnya sendiri, tanpa simbol markdown (#, *, **).
-   Tulis dalam ENAM bagian, masing-masing 110-140 kata (jadi total sekitar ${CONTENT_WORDS.target} kata):
+   Tulis dalam ENAM bagian, masing-masing ${section.lo}-${section.hi} ${rule.unit}${rule.unit === 'kata' ? ` (kira-kira ${Math.max(3, Math.round(section.lo / 14))}-${Math.max(4, Math.round(section.hi / 14))} kalimat per bagian)` : ''} (jadi total sekitar ${rule.target} ${rule.unit}):
    (1) pembuka yang menyebut layanan + area, (2) keunggulan dan alasan memilih, (3) rincian layanan/produk,
    (4) proses kerja dari pesan sampai selesai, (5) area layanan, (6) cara pesan / CTA. Setiap bagian
    diawali sub-judul singkat di barisnya sendiri.
 7. Instruksi operator di atas wajib diikuti selama tidak bertentangan dengan prinsip 3.${revisionBlock}`;
 
   const first = await runAgent<any>("content", prompt, CONTENT_SCHEMA);
-  const words = countWords(first.result?.seoDescription);
-  if (wordsInRange(words) || !first.result?.seoDescription) return first;
+  const m1 = measure(first.result?.seoDescription);
+  const words = m1[rule.unit];
+  if (inRange(rule, m1) || !first.result?.seoDescription) return first;
 
   // Out of range: one targeted pass on the same draft, with the measured number.
   const t0 = Date.now();
   const fixPrompt = `${prompt}
 
-KOREKSI PANJANG (dihitung server, bukan perkiraan): draft Anda ${words} kata, syarat ${CONTENT_WORDS.min}-${CONTENT_WORDS.max} kata.
-${words < CONTENT_WORDS.min ? 'PERLUAS' : 'PERSINGKAT'} seoDescription menjadi sekitar ${CONTENT_WORDS.target} kata TANPA menambah fakta baru:
-tulis ulang sebagai ENAM bagian ber-sub-judul, masing-masing 110-140 kata
-(${words < CONTENT_WORDS.min ? 'perdalam manfaat, rincian layanan, proses kerja, area layanan, dan cara pesan' : 'buang pengulangan dan kalimat umum di tiap bagian'}).
+KOREKSI PANJANG (dihitung server, bukan perkiraan): draft Anda ${words} ${rule.unit}, syarat ${rule.min}-${rule.max} ${rule.unit}.
+${words < rule.min ? `PERLUAS: TAMBAHKAN sekitar ${rule.target - words} ${rule.unit} lagi` : `PERSINGKAT: KURANGI sekitar ${words - rule.target} ${rule.unit}`} sehingga totalnya sekitar ${rule.target} ${rule.unit}, TANPA menambah fakta baru.
+Jangan menulis ulang dari nol: pertahankan draft di bawah ini, lalu ${words < rule.min ? 'perdalam bagian-bagian yang paling tipis' : 'pangkas bagian-bagian yang paling gemuk'}
+sampai tiap bagian ${section.lo}-${section.hi} ${rule.unit}${rule.unit === 'kata' ? ` (kira-kira ${Math.max(3, Math.round(section.lo / 14))}-${Math.max(4, Math.round(section.hi / 14))} kalimat per bagian)` : ''}
+(${words < rule.min ? 'perdalam manfaat, rincian layanan, proses kerja, area layanan, dan cara pesan' : 'buang pengulangan dan kalimat umum di tiap bagian'}).
 Field lain (seoTitle, metaDescription, shortSnippet, productHighlights, callToAction, mappedCategory, tags) pertahankan.
 
 Draft Anda:
 ${first.result.seoDescription}`;
   const second = await runAgent<any>("content", fixPrompt, CONTENT_SCHEMA);
-  const words2 = countWords(second.result?.seoDescription);
-  const keepSecond = wordsInRange(words2) || Math.abs(words2 - CONTENT_WORDS.target) < Math.abs(words - CONTENT_WORDS.target);
+  const m2 = measure(second.result?.seoDescription);
+  const words2 = m2[rule.unit];
+  const keepSecond = inRange(rule, m2) || Math.abs(words2 - rule.target) < Math.abs(words - rule.target);
   const chosen = keepSecond ? second : first;
   const trail: GenerationAttempt = {
     model: second.meta.modelUsed, ok: true, kind: 'call', durationMs: Date.now() - t0,
-    note: `panjang ${words} kata -> koreksi -> ${words2} kata${keepSecond ? '' : ' (draft pertama dipertahankan)'}`
+    note: `panjang ${words} ${rule.unit} -> koreksi -> ${words2} ${rule.unit}${keepSecond ? '' : ' (draft pertama dipertahankan)'}`
   };
   return { result: chosen.result, meta: { ...chosen.meta, attempts: [...first.meta.attempts, ...second.meta.attempts, trail] } };
 }
@@ -1628,15 +1649,21 @@ function normaliseFinding(f: any): AuditFinding {
   return { type, category, message: String(f?.message || ""), fixableBy, field, suggestion: f?.suggestion ? String(f.suggestion) : undefined };
 }
 
-async function runAuditAgent(campaign: any, objective?: string): Promise<{ result: any; meta: AgentMeta }> {
+async function runAuditAgent(
+  campaign: any,
+  objective?: string,
+  rule: LengthRule = parseLengthRule(objective),
+  brief?: Brief
+): Promise<{ result: any; meta: AgentMeta }> {
   const description = campaign.generatedContent?.seoDescription;
-  const words = countWords(description);
+  const m = measure(description);
+  const words = m[rule.unit];
   const prompt = `Evaluasi Kualitas SEO dan Kesiapan Publishing untuk listing DongkrakUsaha berikut:
 
 Title: ${campaign.generatedContent?.seoTitle || campaign.businessData.name}
 Meta Description: ${campaign.generatedContent?.metaDescription || ''}
-Panjang SEO Content (dihitung server): ${words} kata. Syarat: ${CONTENT_WORDS.min}-${CONTENT_WORDS.max} kata. Jangan menghitung ulang sendiri.
-Instruksi operator (Tujuan Campaign): ${objective || '-'}
+Panjang SEO Content (dihitung server): ${m.kata} kata / ${m.kalimat} kalimat / ${m.karakter} karakter. Aturan yang berlaku: ${describeRule(rule)}. Jangan menghitung ulang sendiri.
+${operatorBlock(objective, rule, brief)}
 SEO Content: ${description || campaign.businessData.description}
 Main Keyword: ${campaign.seoStrategy?.mainKeyword || campaign.businessData.mainKeyword}
 Target Cities: ${asList(campaign.businessData.targetCities)}
@@ -1650,6 +1677,10 @@ Jalankan evaluasi komprehensif:
 3. Factual Consistency check
 4. Missing Required Business Info check
 5. Quality Scores (0-100)
+6. Kepatuhan pada INSTRUKSI OPERATOR di atas: kalau konten mengabaikan nada, penekanan, atau
+   struktur yang diminta operator, buat temuan category "Instruksi Operator", type "warning",
+   fixableBy "ai", dan sebutkan instruksi mana yang diabaikan. Panjang TIDAK dinilai di sini --
+   aplikasi sudah mengukurnya.
 
 publishingReadiness harus salah satu dari: READY, WARNINGS, BLOCKED.
 
@@ -1668,16 +1699,16 @@ Jangan pernah menyarankan mengarang data untuk temuan "human".`;
   const out = await runAgent<any>("audit", prompt, AUDIT_SCHEMA);
   // The length verdict is the server's, not the model's: appended here so the
   // revision loop reacts to it whether or not the auditor mentioned it.
-  if (description && !wordsInRange(words) && out.result) {
+  if (description && !inRange(rule, m) && out.result) {
     const findings = Array.isArray(out.result.findings)
       ? out.result.findings.filter((f: any) => !/^(length|panjang)$/i.test(String(f?.category || '')))
       : [];
     findings.push({
       type: 'error',
       category: 'Length',
-      message: `Deskripsi ${words} kata; syarat ${CONTENT_WORDS.min}-${CONTENT_WORDS.max} kata.`,
+      message: `Deskripsi ${words} ${rule.unit}; aturan ${describeRule(rule)}.`,
       fixableBy: 'ai',
-      suggestion: words < CONTENT_WORDS.min ? 'Perluas artikel tanpa menambah fakta baru.' : 'Persingkat artikel, buang pengulangan.'
+      suggestion: words < rule.min ? 'Perluas artikel tanpa menambah fakta baru.' : 'Persingkat artikel, buang pengulangan.'
     });
     out.result.findings = findings;
     if (String(out.result.publishingReadiness || '').toUpperCase() === 'READY') out.result.publishingReadiness = 'WARNINGS';
@@ -2603,6 +2634,12 @@ app.post("/api/orchestrator/run", async (req, res) => {
     campaign,
     runId: requestedRunId
   } = req.body || {};
+  // One rule for the whole run, parsed from the operator's words; the plan agent's
+  // reading of those words is handed down to the writer and the auditor.
+  const lengthRule = parseLengthRule(objective);
+  const briefOf = (): Brief => outputs.plan
+    ? { objective: outputs.plan.objective, taskBreakdown: Array.isArray(outputs.plan.taskBreakdown) ? outputs.plan.taskBreakdown : [] }
+    : undefined;
 
   if (!businessData) {
     return res.status(400).json({ error: "businessData is required to run the orchestrator pipeline." });
@@ -2702,7 +2739,7 @@ app.post("/api/orchestrator/run", async (req, res) => {
   } else {
     const t0 = Date.now();
     try {
-      const { result, meta } = await runContentAgent(businessData, outputs.seoStrategy, undefined, objective);
+      const { result, meta } = await runContentAgent(businessData, outputs.seoStrategy, undefined, objective, lengthRule, briefOf());
       outputs.generatedContent = result;
       record('content', 'Content Generation', 'content', 'done', t0, {
         modelUsed: meta.modelUsed, modelName: meta.modelName,
@@ -2731,7 +2768,7 @@ app.post("/api/orchestrator/run", async (req, res) => {
         seoStrategy: outputs.seoStrategy,
         generatedContent: outputs.generatedContent
       };
-      const { result, meta } = await runAuditAgent(auditInput, objective);
+      const { result, meta } = await runAuditAgent(auditInput, objective, lengthRule, briefOf());
       outputs.audit = result;
       record('audit', 'Quality Control Audit', 'audit', 'done', t0, {
         modelUsed: meta.modelUsed, modelName: meta.modelName,
@@ -2799,7 +2836,7 @@ app.post("/api/orchestrator/run", async (req, res) => {
       const { result, meta } = await runContentAgent(businessData, outputs.seoStrategy, {
         previousContent: outputs.generatedContent,
         audit: auditBefore
-      }, objective);
+      }, objective, lengthRule, briefOf());
       rewritten = result;
       record(`content-revisi-${revisionRound}`, `Content Revision ${revisionRound}`, 'content', 'done', tRewrite, {
         reason: `Audit sebelumnya ${auditBefore.publishingReadiness} (skor ${scoreBefore}); orchestrator meminta perbaikan.`,
@@ -2821,7 +2858,7 @@ app.post("/api/orchestrator/run", async (req, res) => {
         businessData,
         seoStrategy: outputs.seoStrategy,
         generatedContent: rewritten
-      }, objective);
+      }, objective, lengthRule, briefOf());
 
       // Only keep the rewrite if the auditor actually rates it better. A revision that
       // scores worse is discarded, so the loop cannot degrade a draft.
@@ -2832,11 +2869,18 @@ app.post("/api/orchestrator/run", async (req, res) => {
       // leaves the 500-1000 window when the previous draft was inside it is
       // rejected, and one that brings a short draft into the window is kept even on
       // an equal score.
-      const wordsBefore = countWords(outputs.generatedContent?.seoDescription);
-      const wordsAfter = countWords(rewritten?.seoDescription);
-      const lengthRegressed = wordsInRange(wordsBefore) && !wordsInRange(wordsAfter);
-      const lengthFixed = !wordsInRange(wordsBefore) && wordsInRange(wordsAfter);
-      const improved = !lengthRegressed && (scoreAfter >= scoreBefore || lengthFixed);
+      const okBefore = inRange(lengthRule, measure(outputs.generatedContent?.seoDescription));
+      const okAfter = inRange(lengthRule, measure(rewritten?.seoDescription));
+      const lengthRegressed = okBefore && !okAfter;
+      const lengthFixed = !okBefore && okAfter;
+      // Both still outside the window: the draft nearer to it is progress even when
+      // the auditor's score dipped a little (the score never sees the length rule).
+      const distance = (t: any) => {
+        const n = measure(t?.seoDescription)[lengthRule.unit];
+        return n < lengthRule.min ? lengthRule.min - n : n > lengthRule.max ? n - lengthRule.max : 0;
+      };
+      const lengthCloser = !okBefore && !okAfter && distance(rewritten) < distance(outputs.generatedContent);
+      const improved = !lengthRegressed && (scoreAfter >= scoreBefore || lengthFixed || lengthCloser);
       if (improved) {
         outputs.generatedContent = rewritten;
         outputs.audit = reaudit;
@@ -2931,6 +2975,8 @@ app.post("/api/orchestrator/run", async (req, res) => {
     outputs,
     revisionHistory,
     humanActionRequired,
+    rules: { length: lengthRule },
+    measured: measure(outputs.generatedContent?.seoDescription),
     summary: {
       total: ledger.length,
       done: ledger.filter(e => e.status === 'done').length,

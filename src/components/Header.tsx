@@ -1,6 +1,7 @@
 import React from 'react';
 import { Globe, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 import { Campaign, DongkrakUsahaConnectionConfig } from '../types';
+import { APP_VERSION } from '../changelog';
 
 // Navigation lives in BottomNav now; the header is the identity strip + campaign picker.
 interface HeaderProps {
@@ -68,7 +69,7 @@ export const Header: React.FC<HeaderProps> = ({
                 DongkrakUsaha AI Marketing Suite
               </h1>
               <span className="bg-blue-50 text-blue-700 text-2xs font-semibold px-2 py-0.5 rounded-md border border-blue-200">
-                v2.5
+                v{APP_VERSION}
               </span>
             </div>
             <p className="text-xs text-slate-500 hidden sm:block">

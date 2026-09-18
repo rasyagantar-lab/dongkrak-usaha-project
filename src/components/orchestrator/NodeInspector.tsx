@@ -4,6 +4,7 @@ import {
   UserRoundPen, Save, RefreshCw, Play
 } from 'lucide-react';
 import { NODES, type GraphState, type LedgerEntry } from './canvasGraph';
+import { measure, inRange, describe as describeRule, DEFAULT_LENGTH, UNVERIFIED_FIELD_CHARS, type LengthRule } from '../../lib/lengthRule';
 
 /*
   The detail side of the canvas: pick a node, read exactly what that agent did.
@@ -40,6 +41,8 @@ interface InspectorProps {
   nodeId: string;
   graph: GraphState;
   outputs: any;
+  /** Rule the run was measured against; defaults to the supervisor's rule. */
+  lengthRule?: LengthRule;
   blockers: string[];
   revisionHistory: Array<{ round: number; scoreBefore: number; scoreAfter: number; readinessBefore: string; readinessAfter: string; accepted: boolean }>;
   humanFindings: HumanFinding[];
@@ -68,16 +71,28 @@ const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title
   </div>
 );
 
-// The supervisor's rule made visible: the server counts the same way (whitespace-
-// separated tokens), so this number matches the one the audit judged.
-const WORD_RANGE = { min: 500, max: 1000 };
-const WordCount: React.FC<{ text?: string }> = ({ text }) => {
-  const n = String(text || '').trim().split(/\s+/).filter(Boolean).length;
-  const ok = n >= WORD_RANGE.min && n <= WORD_RANGE.max;
+// The rule made visible: the same measure() the server judged with, in all three
+// units, next to the rule that applied to this run. The field-limit warning stays
+// until a real publish measures the DongkrakUsaha description field.
+const LengthBadge: React.FC<{ text?: string; rule: LengthRule }> = ({ text, rule }) => {
+  const m = measure(text);
+  const ok = inRange(rule, m);
+  const fmt = (n: number) => n.toLocaleString('id-ID');
   return (
-    <div className="flex items-center gap-2 text-2xs">
-      <span className={`px-2 py-0.5 rounded font-bold ${ok ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'}`}>{n} kata</span>
-      <span className="text-slate-500">syarat {WORD_RANGE.min}–{WORD_RANGE.max} kata</span>
+    <div className="space-y-1 text-2xs">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={`px-2 py-0.5 rounded font-bold ${ok ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'}`}>
+          {fmt(m[rule.unit])} {rule.unit}
+        </span>
+        <span className="text-slate-500">aturan {describeRule(rule)}</span>
+      </div>
+      <div className="text-slate-500">
+        {fmt(m.kata)} kata · {fmt(m.kalimat)} kalimat · {fmt(m.karakter)} karakter
+        {m.karakter > UNVERIFIED_FIELD_CHARS && (
+          <span className="text-amber-300/90"> · &gt; {fmt(UNVERIFIED_FIELD_CHARS)} karakter: batas field DongkrakUsaha belum diverifikasi</span>
+        )}
+      </div>
+      {rule.clamped && <div className="text-amber-300/90">{rule.clamped}</div>}
     </div>
   );
 };
@@ -99,7 +114,7 @@ const Chips: React.FC<{ items: string[]; tone?: string }> = ({ items, tone = 'bg
 );
 
 export const NodeInspector: React.FC<InspectorProps> = ({
-  nodeId, graph, outputs, blockers, revisionHistory, humanFindings, humanFields,
+  nodeId, graph, outputs, lengthRule, blockers, revisionHistory, humanFindings, humanFields,
   editValue, onEditField, onSaveHumanEdits, onSaveAndRerun, onApply, applied, canApply,
   businessName, isRunning, onClose
 }) => {
@@ -218,7 +233,7 @@ export const NodeInspector: React.FC<InspectorProps> = ({
 
         {nodeId === 'content' && outputs?.generatedContent && (
           <Section title="Konten listing">
-            <WordCount text={outputs.generatedContent.seoDescription} />
+            <LengthBadge text={outputs.generatedContent.seoDescription} rule={lengthRule || DEFAULT_LENGTH} />
             <Field label="Judul SEO" value={outputs.generatedContent.seoTitle} />
             <Field label="Meta" value={outputs.generatedContent.metaDescription} />
             <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{outputs.generatedContent.seoDescription}</p>

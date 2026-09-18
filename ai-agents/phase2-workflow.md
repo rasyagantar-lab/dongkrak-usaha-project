@@ -176,3 +176,16 @@ Every completed task in Phase 2 must update this file with what worked, what fai
 
 ## Publish Tab: Direct "Input Produk" (2026-09-15)
 - The extension can now press DongkrakUsaha's own "Input Produk" button (list page -> entry form) on request; see PROJECT_KNOWLEDGE.md "One Click To DongkrakUsaha's Input Produk Form". Finder verified on synthetic DOM; real-site verification pending the operator's login. The landed URL, once observed, should be recorded as the proven form URL.
+
+
+## Verifying The Description Field Limit (2026-09-18)
+
+The DongkrakUsaha description field is a CKEditor rich-text box: it carries no `maxlength`, so the only proof of its limit is to save a long text and count what the page holds afterwards. Extension 1.2.0 adds the counter.
+
+1. Reload the unpacked extension (chrome://extensions -> reload) so 1.2.0 is active.
+2. Open the Input Produk form -> extension popup -> **Ukur Field Halaman Ini**. Note every `maxlength` it lists (this answers the "deskripsi singkat 200 karakter" claim directly). The result also appears in the app's Publish tab under "Batas field terdeteksi".
+3. In AI Orchestrator, type "tulis 950–1000 kata" in the instruction field (the "Terbaca:" line must show the operator rule), run, Terapkan ke Campaign, then Publish (autopost) the campaign -- about 6.500 characters.
+4. Open the saved product's edit page -> **Ukur Field Halaman Ini** again. The Publish tab compares "dikirim" (the campaign's description) with "tersimpan" (what the page holds): "utuh" means no truncation at that size.
+5. To find a higher ceiling, paste ~10.000 characters into the editor by hand, save, reopen, measure again. The first size that comes back shorter is the limit.
+6. Moderation / syndication effects are only visible after ~24 h; record them in PROJECT_KNOWLEDGE.md.
+7. With the numbers in hand, set `DEFAULT_LENGTH` and `UNVERIFIED_FIELD_CHARS` in `src/lib/lengthRule.ts` and drop the "belum diverifikasi" warning.
