@@ -17,6 +17,7 @@ import { GettingStartedGuide } from './components/GettingStartedGuide';
 import { JobTray } from './components/JobTray';
 import { BottomNav } from './components/BottomNav';
 import { JobCenterProvider } from './jobs';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { INITIAL_CAMPAIGNS } from './data/sampleBusinesses';
 import { Campaign, DongkrakUsahaConnectionConfig } from './types';
 
@@ -26,9 +27,17 @@ import { Campaign, DongkrakUsahaConnectionConfig } from './types';
 // their form inputs are still there when they come back. The settle-in animation
 // restarts each time a section goes from hidden to shown, so tab switches still feel
 // like a transition without any remount.
+const TAB_LABELS: Record<string, string> = {
+  business: 'Data Bisnis', 'market-siege': 'Kepung Pasar', orchestrator: 'AI Orchestrator',
+  'visual-asset': 'Visual Aset', 'dongkrak-preview': 'Preview', 'publishing-hub': 'Publish',
+  'connection-settings': 'Koneksi', history: 'Riwayat'
+};
+
 const TabPanel: React.FC<{ id: string; active: string; children: React.ReactNode }> = ({ id, active, children }) => (
   <section hidden={active !== id} className="animate-du-panel-in motion-reduce:animate-none">
-    {children}
+    {/* Per-tab boundary: a render error in one panel must not white-screen the whole
+        app while a pipeline is running in another. */}
+    <ErrorBoundary label={TAB_LABELS[id] || id}>{children}</ErrorBoundary>
   </section>
 );
 
@@ -239,6 +248,11 @@ export default function App() {
 
   return (
     <JobCenterProvider>
+    {/* Outermost net, deliberately inside the Job Center: a crash in the shell (header,
+        tray, nav) used to unmount everything and leave a white page with no way back
+        except reloading. Retrying from here re-mounts the UI while running jobs, which
+        live in the provider above, keep going. */}
+    <ErrorBoundary label="Aplikasi">
     <div className="min-h-screen bg-slate-100 text-slate-800 flex flex-col font-sans" style={{ paddingBottom: 'var(--du-bottom-nav)' }}>
       <WelcomeSplash />
 
@@ -335,6 +349,7 @@ export default function App() {
       <JobTray onNavigate={handleNavigateFromTray} />
       <BottomNav activeTab={activeTab} setActiveTab={goToTab} />
     </div>
+    </ErrorBoundary>
     </JobCenterProvider>
   );
 }

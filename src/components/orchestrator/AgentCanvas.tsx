@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Building2, Workflow, Sparkles, KeyRound, PenLine, ShieldCheck, Image as ImageIcon,
   UserRoundPen, CheckCircle2, XCircle, MinusCircle, RefreshCw, Plus, Minus, Maximize2,
@@ -91,13 +92,16 @@ export const AgentCanvas: React.FC<AgentCanvasProps> = ({
 
   // Fit the whole graph into the viewport: used on mount, on rotation and by the fit
   // button, because a canvas that opens half off-screen reads as broken.
+  const toolbarRef = useRef<HTMLDivElement>(null);
   const fit = useCallback(() => {
     const host = hostRef.current;
     if (!host) return;
-    // The toolbar floats over the top-left of the canvas, so the graph is fitted into
-    // the area below it -- otherwise the first agent sits under the run button.
+    // The toolbar floats over the top of the canvas, so the graph is fitted into the
+    // area below it -- otherwise the first agent sits under the run button. Its height
+    // is measured, not assumed: on a phone the campaign name, the objective field and
+    // the run button stack into roughly twice the desktop height.
     const pad = 28;
-    const padTop = 104;
+    const padTop = (toolbarRef.current?.offsetHeight ?? 76) + 28;
     const w = host.clientWidth - pad * 2;
     const h = host.clientHeight - padTop - pad;
     if (w <= 0 || h <= 0) return;
@@ -309,7 +313,7 @@ export const AgentCanvas: React.FC<AgentCanvasProps> = ({
         ))}
       </div>
 
-      <div className="absolute top-0 inset-x-0 p-3 sm:p-4 pointer-events-none">
+      <div ref={toolbarRef} className="absolute top-0 inset-x-0 p-3 sm:p-4 pointer-events-none">
         <div className="pointer-events-auto">{toolbar}</div>
       </div>
 
@@ -346,10 +350,15 @@ export const AgentCanvas: React.FC<AgentCanvasProps> = ({
   );
 
   if (!fullscreen) return canvas;
-  return (
+  // Portal to the body on purpose. Every tab panel keeps a finished transform from its
+  // settle-in animation (fill-mode: both), and a transformed ancestor becomes the
+  // containing block for position: fixed -- so an overlay rendered in place sized
+  // itself to the tab box instead of the viewport and collapsed to a thin strip.
+  return createPortal(
     <div className="fixed inset-0 z-50 bg-slate-950 animate-du-fade-in motion-reduce:animate-none" style={{ paddingBottom: 'var(--du-bottom-nav)' }}>
       {canvas}
-    </div>
+    </div>,
+    document.body
   );
 };
 
