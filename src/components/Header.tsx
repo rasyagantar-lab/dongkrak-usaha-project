@@ -86,6 +86,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-lg border border-slate-200 min-w-0 max-w-full">
             <span className="text-xs text-slate-500 font-medium pl-1 hidden sm:inline shrink-0">Campaign:</span>
             <select
+              data-guide="header.campaign"
               value={activeCampaignId}
               onChange={(e) => setActiveCampaignId(e.target.value)}
               className="bg-white text-xs text-slate-800 font-semibold border border-slate-200 rounded-md px-2.5 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0 max-w-[70vw] sm:max-w-xs truncate"

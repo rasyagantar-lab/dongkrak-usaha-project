@@ -159,6 +159,10 @@ Aset milik pemilik: `public/guide/mitsuru-idle.png` (foto 1), `public/guide/mits
 saja (>= 1024 px). Kotak dialog hitam bertepi sobek, tag nama merah, teks putih Inter 14/22,
 maks 2 kalimat fungsi + 1 baris fakta dari PROJECT_KNOWLEDGE. Bisukan tersimpan per pemakai.
 Semua nama/aset/gaya bicara di `src/guide/persona.ts` supaya dapat diganti dari satu tempat.
+Dibangun 2026-09-19: aside `du-guide du-dark` (scope gelap agar `text-white` tetap putih), tag nama di luar
+kotak ber-clip-path (kalau di dalam ikut terpotong), cincin medali memakai `box-shadow: inset` (outline
+ikut terpotong clip), posisi `bottom: nav + 92px` di atas widget status agent; kontrol kanvas dicerminkan
+ke kiri bawah di tema ini. Ketikan 18 ms/karakter, idle kembali setelah 4 s, baris idle berganti tiap 12 s.
 
 ## Lantai aksesibilitas & performa
 

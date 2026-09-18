@@ -45,6 +45,7 @@ const JobRow: React.FC<{ job: Job; onNavigate: JobTrayProps['onNavigate']; onDis
   return (
     <div
       role="status"
+      data-guide="tray.job"
       className="du-card relative pointer-events-auto w-full sm:w-80 bg-white/95 border border-slate-200 rounded-xl shadow-lg overflow-hidden animate-du-scale-in motion-reduce:animate-none"
     >
       <button

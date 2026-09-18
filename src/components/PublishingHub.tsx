@@ -134,7 +134,7 @@ const FieldMeasurePanel: React.FC<{ measure: FieldMeasure | null; sentText?: str
   return (
     <div className="p-3 bg-slate-900 rounded border border-slate-800 space-y-1.5 text-xs">
       <div className="flex items-center justify-between gap-2">
-        <span className="font-bold text-slate-200">Batas field terdeteksi</span>
+        <span className="font-bold text-slate-200" data-guide="publish.ukur">Batas field terdeteksi</span>
         <span className="text-3xs text-slate-500">{measure.measuredAt ? new Date(measure.measuredAt).toLocaleTimeString('id-ID') : ''}</span>
       </div>
       {measure.ok ? (
@@ -1047,6 +1047,7 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
         </button>
         <button
           onClick={() => setPublisherMode('MANUAL')}
+          data-guide="publish.mode"
           className={`px-4 py-2 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${
             publisherMode === 'MANUAL' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:bg-slate-200'
           }`}
@@ -1767,7 +1768,7 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
               <div className="space-y-3">
                 <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-2xs rounded-lg font-medium flex items-center justify-between">
                   <span>✓ Berhasil memvalidasi {extState.fieldsDiscovered.length} field dari form terotorisasi DongkrakUsaha.</span>
-                  <button
+                  <button data-guide="publish.refresh-dom"
                     onClick={() => requestExtensionState('refresh-live-dom-' + Date.now())}
                     className="text-emerald-700 hover:underline font-bold text-2xs flex items-center gap-1 cursor-pointer"
                   >
@@ -1824,7 +1825,7 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
                   </p>
                 </div>
                 <div className="flex flex-wrap justify-center gap-2">
-                  <button
+                  <button data-guide="publish.buka-form"
                     onClick={handleOpenInputProduk}
                     className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white font-bold text-xs rounded-lg hover:bg-blue-700 transition-colors shadow-xs cursor-pointer"
                   >
@@ -1853,7 +1854,7 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
                 Langkah Publishing Manual Assist:
               </h4>
               <div className="flex items-center gap-3">
-                <button onClick={handleOpenInputProduk} className="inline-flex items-center gap-1 text-blue-600 font-bold hover:underline cursor-pointer">
+                <button data-guide="publish.buka-form" onClick={handleOpenInputProduk} className="inline-flex items-center gap-1 text-blue-600 font-bold hover:underline cursor-pointer">
                   <Zap className="w-3.5 h-3.5" /> Buka Form Input Produk (klik otomatis)
                 </button>
                 <a href="https://dongkrakusaha.com/panelMember/index.php?menu=produk" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-slate-500 font-semibold hover:underline">
@@ -1875,12 +1876,13 @@ export const PublishingHub: React.FC<PublishingHubProps> = ({
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={handleAutofillCampaign}
+                  data-guide="publish.isi-form"
                   disabled={!activeCampaign.dongkrakListingData || !extState.formDetected}
                   className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg disabled:opacity-50 cursor-pointer"
                 >
                   <Zap className="w-3.5 h-3.5" /> Isi Form Otomatis
                 </button>
-                <button
+                <button data-guide="publish.submit"
                   onClick={handleSubmitCampaign}
                   disabled={!autopostResult?.success || autopostResult?.captchaDetected || autopostResult?.imageReady === false}
                   className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg disabled:opacity-50 cursor-pointer"

@@ -322,16 +322,17 @@ export const AgentCanvas: React.FC<AgentCanvasProps> = ({
       </div>
 
       {isRunning && (
-        <div className="absolute left-3 bottom-3 sm:left-4 sm:bottom-4 pointer-events-none flex items-center gap-2 rounded-full bg-slate-900/90 border border-sky-500/40 px-3 py-1.5 text-2xs text-sky-200 max-w-[60%]">
+        <div className="du-canvas-progress absolute left-3 bottom-3 sm:left-4 sm:bottom-4 pointer-events-none flex items-center gap-2 rounded-full bg-slate-900/90 border border-sky-500/40 px-3 py-1.5 text-2xs text-sky-200 max-w-[60%]">
           <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0" />
           <span className="truncate">{progressLabel || 'Menyiapkan pipeline...'}</span>
         </div>
       )}
 
-      <div className="absolute right-3 bottom-3 sm:right-4 sm:bottom-4 flex items-center gap-1.5">
+      <div className="du-canvas-controls absolute right-3 bottom-3 sm:right-4 sm:bottom-4 flex items-center gap-1.5">
         <button
           type="button"
           onClick={() => { const next = !lowPower; setLowPower(next); setAutoLowPower(false); writeLowPower(next); }}
+          data-guide="orchestrator.hemat"
           title={lowPower ? 'Nyalakan gerak aliran data' : 'Matikan gerak, status tetap tampil'}
           className={`inline-flex items-center gap-1 rounded-lg bg-slate-900/90 border px-2 py-1.5 text-3xs font-semibold cursor-pointer hover:bg-slate-800 ${
             lowPower ? 'border-amber-500/50 text-amber-300' : 'border-slate-700 text-slate-400'
@@ -341,11 +342,11 @@ export const AgentCanvas: React.FC<AgentCanvasProps> = ({
           {lowPower ? (autoLowPower ? 'hemat (otomatis)' : 'hemat') : 'gerak'}
         </button>
         <div className="flex items-center rounded-lg bg-slate-900/90 border border-slate-700 overflow-hidden">
-          <CtrlButton onClick={() => zoomAt(1 / 1.15, 0, 0)} title="Perkecil"><Minus className="w-3.5 h-3.5" /></CtrlButton>
+          <CtrlButton onClick={() => zoomAt(1 / 1.15, 0, 0)} title="Perkecil" guide="orchestrator.zoom"><Minus className="w-3.5 h-3.5" /></CtrlButton>
           <span className="px-2 text-3xs font-mono text-slate-400 tabular-nums">{Math.round(view.k * 100)}%</span>
-          <CtrlButton onClick={() => zoomAt(1.15, 0, 0)} title="Perbesar"><Plus className="w-3.5 h-3.5" /></CtrlButton>
-          <CtrlButton onClick={fit} title="Paskan ke layar (0)"><Crosshair className="w-3.5 h-3.5" /></CtrlButton>
-          <CtrlButton onClick={() => setFullscreen(f => !f)} title={fullscreen ? 'Keluar layar penuh (Esc)' : 'Layar penuh'}>
+          <CtrlButton onClick={() => zoomAt(1.15, 0, 0)} title="Perbesar" guide="orchestrator.zoom"><Plus className="w-3.5 h-3.5" /></CtrlButton>
+          <CtrlButton onClick={fit} title="Paskan ke layar (0)" guide="orchestrator.fit"><Crosshair className="w-3.5 h-3.5" /></CtrlButton>
+          <CtrlButton onClick={() => setFullscreen(f => !f)} title={fullscreen ? 'Keluar layar penuh (Esc)' : 'Layar penuh'} guide="orchestrator.fullscreen">
             {fullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
           </CtrlButton>
         </div>
@@ -366,8 +367,8 @@ export const AgentCanvas: React.FC<AgentCanvasProps> = ({
   );
 };
 
-const CtrlButton: React.FC<{ onClick: () => void; title: string; children: React.ReactNode }> = ({ onClick, title, children }) => (
-  <button type="button" onClick={onClick} title={title} className="p-2 text-slate-300 hover:text-white hover:bg-slate-800 cursor-pointer">
+const CtrlButton: React.FC<{ onClick: () => void; title: string; guide?: string; children: React.ReactNode }> = ({ onClick, title, guide, children }) => (
+  <button type="button" onClick={onClick} title={title} data-guide={guide} className="p-2 text-slate-300 hover:text-white hover:bg-slate-800 cursor-pointer">
     {children}
   </button>
 );

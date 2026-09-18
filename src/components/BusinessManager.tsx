@@ -148,6 +148,7 @@ export const BusinessManager: React.FC<BusinessManagerProps> = ({
           </button>
           <button
             onClick={handleSave}
+              data-guide="bisnis.simpan"
             className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 shadow-xs transition-colors"
           >
             <Save className="w-4 h-4" />

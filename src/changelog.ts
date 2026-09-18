@@ -23,7 +23,8 @@ export const CHANGELOG: ChangelogEntry[] = [
     title: 'Tema Persona (beta) — pilih di Koneksi',
     items: [
       'Tab Koneksi → Tampilan: pilih "Persona" untuk tampilan hitam-merah-putih bergaya menu Persona 5 (huruf potongan, kartu bertepi sobek, nav miring). Tampilan standar tetap default dan tidak berubah.',
-      'Tahap 1 dari 3: fondasi warna, huruf, bentuk, dan nav. Tahap berikutnya: pemandu di pojok layar, lalu kanvas orchestrator & isi tiap tab.',
+      'Pemandu di pojok kanan bawah (desktop): arahkan kursor ke tab, tombol, atau kotak agent — dia menjelaskan fungsinya dan fakta bagaimana bagian itu lahir. Bisa disembunyikan; pilihan tersimpan.',
+      'Tahap 2 dari 3 selesai. Berikutnya: kanvas orchestrator & isi tiap tab dengan gaya yang sama.',
       'Pilihan tersimpan di browser masing-masing; semua fungsi sama di kedua tampilan.'
     ]
   },

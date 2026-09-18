@@ -198,6 +198,7 @@ export const OrchestratorPanel: React.FC<OrchestratorPanelProps> = ({ campaign, 
           type="text"
           value={objective}
           onChange={e => setObjective(e.target.value)}
+          data-guide="orchestrator.instruksi"
           placeholder="Tujuan & instruksi untuk semua agent"
           title="Diteruskan ke agent Plan, Strategi, Keyword, Konten, dan Audit. Contoh: tonjolkan garansi; artikel sekitar 700 kata."
           className="w-full sm:w-72 text-xs bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-2 text-slate-100 placeholder:text-slate-600 focus:ring-2 focus:ring-sky-500 focus:outline-none"
@@ -205,6 +206,7 @@ export const OrchestratorPanel: React.FC<OrchestratorPanelProps> = ({ campaign, 
         <button
           type="button"
           onClick={() => handleRun()}
+          data-guide="orchestrator.jalankan"
           disabled={isRunning || !objective.trim()}
           className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-sky-500 hover:bg-sky-400 disabled:bg-slate-800 disabled:text-slate-400 text-slate-950 text-xs font-bold rounded-lg cursor-pointer shrink-0"
         >
@@ -213,7 +215,7 @@ export const OrchestratorPanel: React.FC<OrchestratorPanelProps> = ({ campaign, 
         </button>
       </div>
 
-      <div className={`text-2xs leading-snug ${readRule.clamped ? 'text-amber-300' : readRule.source === 'operator' ? 'text-sky-300' : 'text-slate-500'}`}>
+      <div data-guide="orchestrator.terbaca" className={`text-2xs leading-snug ${readRule.clamped ? 'text-amber-300' : readRule.source === 'operator' ? 'text-sky-300' : 'text-slate-500'}`}>
         <span className="font-bold">Terbaca:</span>{' '}
         {readRule.clamped
           ? readRule.clamped
@@ -249,6 +251,7 @@ export const OrchestratorPanel: React.FC<OrchestratorPanelProps> = ({ campaign, 
             <button
               type="button"
               onClick={handleApply}
+              data-guide="orchestrator.terapkan"
               disabled={applied}
               className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 font-bold hover:bg-emerald-500/25 disabled:opacity-60 cursor-pointer"
             >
@@ -256,7 +259,7 @@ export const OrchestratorPanel: React.FC<OrchestratorPanelProps> = ({ campaign, 
             </button>
           )}
           {run && (
-            <button type="button" onClick={copyLedger} className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-slate-400 hover:text-slate-200 cursor-pointer">
+            <button type="button" onClick={copyLedger} data-guide="orchestrator.ledger" className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-slate-400 hover:text-slate-200 cursor-pointer">
               <ClipboardCopy className="w-3 h-3" />{copied ? 'tersalin' : 'salin ledger'}
             </button>
           )}

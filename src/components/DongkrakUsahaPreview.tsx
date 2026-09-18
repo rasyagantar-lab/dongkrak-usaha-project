@@ -38,7 +38,7 @@ export const DongkrakUsahaPreview: React.FC<DongkrakUsahaPreviewProps> = ({
         </button>
       </div>
 
-      <div className="du-card bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+      <div className="du-card bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm" data-guide="preview.listing">
         <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 font-bold text-slate-700 flex items-center gap-2">
           PRODUK input
         </div>

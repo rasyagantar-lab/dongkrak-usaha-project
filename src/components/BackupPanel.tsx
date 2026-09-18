@@ -140,6 +140,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ onReloadCampaigns }) =
         <button
           type="button"
           onClick={handleDownload}
+          data-guide="koneksi.cadangan"
           disabled={busy !== null}
           className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-bold rounded-lg cursor-pointer"
         >

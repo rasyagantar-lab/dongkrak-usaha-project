@@ -251,3 +251,69 @@
   :root[data-theme="persona"] .du-btn:active:not(:disabled) { animation: none !important; }
   :root[data-theme="persona"] .du-btn::before, :root[data-theme="persona"] .du-nav-item { transition: none; }
 }
+
+/* ---- pemandu (Tahap 2): portrait dalam medali cipratan tinta + kotak dialog sobek ---- */
+:root[data-theme="persona"] .du-guide-box {
+  background: var(--p5-black);
+  border: var(--p5-line) solid var(--p5-white);
+  clip-path: polygon(0 8px, 10px 0, calc(100% - 22px) 0, 100% 14px, 100% calc(100% - 10px), calc(100% - 8px) 100%, 18px 100%, 0 calc(100% - 16px));
+  transform-origin: right bottom;
+  animation: du-p5-guide-open 200ms var(--p5-ease) both;
+}
+:root[data-theme="persona"] .du-guide[data-speaking="true"] .du-guide-box { animation: du-p5-guide-pop 200ms var(--p5-ease) both; }
+:root[data-theme="persona"] .du-guide-tag {
+  background: var(--p5-red);
+  color: var(--p5-white);
+  font-family: var(--font-display);
+  letter-spacing: 0.12em;
+  transform: skewX(var(--p5-skew));
+  box-shadow: 3px 3px 0 var(--p5-white);
+}
+:root[data-theme="persona"] .du-guide-portrait {
+  clip-path: polygon(50% 0, 63% 9%, 80% 4%, 84% 20%, 100% 28%, 92% 44%, 100% 62%, 86% 70%, 88% 88%, 70% 86%, 56% 100%, 42% 90%, 24% 98%, 18% 80%, 2% 72%, 10% 56%, 0 40%, 12% 28%, 8% 10%, 28% 12%, 36% 0);
+  background: var(--p5-black);
+  transition: transform 120ms var(--p5-ease);
+}
+:root[data-theme="persona"] .du-guide[data-speaking="true"] .du-guide-portrait { transform: scale(1.04) rotate(-2deg); }
+:root[data-theme="persona"] .du-guide-portrait::after {
+  /* Inset ring: an outline would be clipped away with the blot. */
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  clip-path: inherit;
+  box-shadow: inset 0 0 0 var(--p5-line) var(--p5-white);
+}
+:root[data-theme="persona"] .du-guide-portrait img { animation: du-p5-fade 120ms var(--p5-ease) both; }
+:root[data-theme="persona"] .du-guide-caret {
+  display: inline-block; width: 0.5em; height: 1em; margin-left: 2px; vertical-align: -0.15em;
+  background: var(--p5-red);
+  animation: du-p5-caret 700ms steps(1) infinite;
+}
+:root[data-theme="persona"] .du-guide[data-speaking="false"] .du-guide-caret { display: none; }
+:root[data-theme="persona"] .du-guide-fact-tag {
+  display: inline-block; padding: 0 0.4em; margin-right: 0.25em;
+  background: var(--p5-yellow); color: var(--p5-black);
+  font-family: var(--font-display); font-size: 10px; letter-spacing: 0.1em;
+  transform: skewX(var(--p5-skew));
+}
+:root[data-theme="persona"] .du-guide-fact { animation: du-p5-fade 160ms var(--p5-ease) both; }
+:root[data-theme="persona"] .du-guide-chip {
+  background: var(--p5-black); color: var(--p5-white);
+  border: 2px solid var(--p5-white);
+  font-family: var(--font-display); letter-spacing: 0.08em;
+  transform: skewX(var(--p5-skew));
+}
+@keyframes du-p5-guide-open { from { opacity: 0; transform: scaleX(0.6); } to { opacity: 1; transform: scaleX(1); } }
+@keyframes du-p5-guide-pop { from { transform: scale(0.98) translateY(4px); } to { transform: scale(1) translateY(0); } }
+@keyframes du-p5-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes du-p5-caret { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  :root[data-theme="persona"] .du-guide-box, :root[data-theme="persona"] .du-guide-portrait img,
+  :root[data-theme="persona"] .du-guide-fact, :root[data-theme="persona"] .du-guide-caret { animation: none !important; }
+  :root[data-theme="persona"] .du-guide-portrait { transition: none; }
+}
+
+/* Pemandu berdiri di kanan bawah; supaya tidak menutupi kontrol kanvas, di tema ini
+   kontrol zoom/layar penuh dicerminkan ke kiri bawah dan pil progres ke kanan bawah. */
+@media (min-width: 1024px) {
+  :root[data-theme="persona"] .du-canvas-controls { right: auto; left: 1rem; }
+  :root[data-theme="persona"] .du-canvas-progress { left: auto; right: 1rem; max-width: 40%; }
+}

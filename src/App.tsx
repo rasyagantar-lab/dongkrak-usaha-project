@@ -18,6 +18,7 @@ import { JobTray } from './components/JobTray';
 import { BottomNav } from './components/BottomNav';
 import { JobCenterProvider } from './jobs';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { GuideCompanion } from './guide/GuideCompanion';
 import { INITIAL_CAMPAIGNS } from './data/sampleBusinesses';
 import { Campaign, DongkrakUsahaConnectionConfig } from './types';
 
@@ -348,6 +349,7 @@ export default function App() {
       <ModelStatusIndicator />
       <JobTray onNavigate={handleNavigateFromTray} />
       <BottomNav activeTab={activeTab} setActiveTab={goToTab} />
+      <GuideCompanion />
     </div>
     </ErrorBoundary>
     </JobCenterProvider>

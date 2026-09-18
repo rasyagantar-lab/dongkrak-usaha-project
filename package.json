@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test": "tsx tests/lengthRule.test.ts && tsx tests/listingData.test.ts"
+    "test": "tsx tests/lengthRule.test.ts && tsx tests/listingData.test.ts && tsx tests/guideRegistry.test.ts"
   },
   "dependencies": {
     "@google-cloud/firestore": "^9.1.0",

@@ -144,7 +144,7 @@ export const ModelStatusIndicator: React.FC = () => {
           <div className="mt-2 pt-2 border-t border-slate-100 text-xs w-80 max-h-96 overflow-y-auto">
             <div className="flex items-center justify-between mb-2">
               <span className="font-semibold text-slate-700">Slot Key & Quota per Agent</span>
-              <button onClick={fetchStatus} disabled={isLoading} className="text-blue-600 hover:text-blue-800">
+              <button onClick={fetchStatus} disabled={isLoading} data-guide="status.agent" className="text-blue-600 hover:text-blue-800">
                 <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
               </button>
             </div>

@@ -124,7 +124,7 @@ export const PublishingHistory: React.FC = () => {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-xs" data-guide="riwayat.tabel">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
                 <tr>
                   <th className="p-3.5">Nama Bisnis & Campaign</th>
